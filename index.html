@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Gym Tracker V10 Elite Pro v1.0.9</title>
+<title>Gym Tracker V10 Elite Pro v2.0.3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
@@ -40,6 +40,7 @@ header h1 .icon{font-size:1.4rem;-webkit-text-fill-color:initial}
 .nav-btn:active{transform:scale(0.9)}
 .page{display:none;padding:12px 14px 20px;position:relative;z-index:1;animation:fadeUp 0.3s ease}
 .page.show{display:block}
+@media(min-width:768px){body{max-width:520px;margin:0 auto;box-shadow:0 0 80px rgba(0,0,0,0.5)}.bottom-nav{max-width:520px;left:50%;transform:translateX(-50%)}.timer-btn{right:calc(50% - 244px)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .card{background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--rad);padding:14px;margin:10px 0;position:relative;overflow:hidden;transition:var(--tr)}
 .card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(0,230,118,0.1),transparent)}
@@ -137,15 +138,13 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--ac);box-
 .save-toast .toast-icon{font-size:1rem}
 
 .switch-wrap{display:flex;align-items:center;justify-content:space-between;background:var(--inp);border:1px dashed var(--bdr);padding:10px 14px;border-radius:10px;margin-top:8px}
-.switch-label{font-size:0.8rem;color:var(--tx);font-weight:600;cursor:pointer}
-.switch-box{position:relative;display:inline-block;width:46px;height:24px}
-.switch-box input{opacity:0;width:0;height:0}
 .switch-slider{position:absolute;cursor:pointer;inset:0;background-color:var(--bg3);border:1px solid var(--bdr);border-radius:24px;transition:var(--tr)}
 .switch-slider:before{position:absolute;content:"";height:16px;width:16px;left:3px;bottom:3px;background-color:var(--tx2);border-radius:50%;transition:var(--tr)}
+.switch-box{position:relative;display:inline-block;width:46px;height:24px}
+.switch-box input{opacity:0;width:0;height:0}
 .switch-box input:checked + .switch-slider{background-color:rgba(0,230,118,0.15);border-color:var(--ac)}
 .switch-box input:checked + .switch-slider:before{transform:translateX(22px);background-color:var(--ac)}
 
-@media(min-width:768px){body{max-width:520px;margin:0 auto;box-shadow:0 0 80px rgba(0,0,0,0.5)}.bottom-nav{max-width:520px;left:50%;transform:translateX(-50%)}.timer-btn{right:calc(50% - 244px)}}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:4px}
 #confetti{position:fixed;inset:0;z-index:999;pointer-events:none}
 .pr-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
@@ -157,6 +156,9 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--ac);box-
 .global-date-container{background:var(--inp);border:1px solid var(--bdr);border-radius:10px;padding:8px 12px;margin-top:10px;display:flex;align-items:center;gap:10px}
 .global-date-container label{font-size:0.75rem;font-weight:700;color:var(--ac2);text-transform:uppercase;letter-spacing:0.5px}
 .global-date-container input[type="date"]{flex:1;padding:6px 10px;font-size:0.85rem;color-scheme:dark;border-radius:6px;border:1px solid var(--bdr);background:var(--bg0)}
+
+.version-card {background: var(--bg3); border: 1px solid var(--bdr); border-radius: var(--rad); padding: 12px; text-align: center; font-size: 0.75rem; color: var(--tx2); font-weight: 600; letter-spacing: 0.5px; margin-top: 12px; display: flex; align-items: center; justify-content: space-between;}
+.version-tag {background: rgba(0, 188, 212, 0.12); border: 1px solid rgba(0, 188, 212, 0.3); padding: 2px 8px; border-radius: 6px; color: var(--ac2); font-family: monospace; font-size: 0.8rem;}
 </style>
 </head>
 <body>
@@ -242,7 +244,7 @@ let S = {
   protein: "",
   steps: "",
   gdriveSyncEnabled: false,
-  gdriveLastSyncTime: "Never",
+  gdriveSyncKey: "",
   streak: {count:0, lastDate:null},
   workoutLog: {},
   calMonth: new Date().getMonth(),
@@ -252,7 +254,7 @@ let S = {
   waistHistory: [],
   proteinHistory: [],
   stepsHistory: [],
-  workoutDate: new Date().toISOString().split("T")[0],
+  workoutDate: "",
   lightTheme: false
 };
 
@@ -338,8 +340,9 @@ function loadState(){
       }
     } catch(e) { console.error(e); }
   }
-  if(!S.workoutDate) S.workoutDate = new Date().toISOString().split("T")[0];
-  if(!S.gdriveLastSyncTime) S.gdriveLastSyncTime = "Never";
+  
+  const nowStr = new Date().toISOString().split("T")[0];
+  S.workoutDate = nowStr;
   
   let d = new Date(S.workoutDate);
   let dayIdx = (d.getDay()+6)%7;
@@ -422,79 +425,79 @@ function loadActiveDayLog(){
   S.fields["steps"] = (stepsRecord && stepsRecord.value !== "") ? stepsRecord.value : "";
 }
 
+function generateRandomSyncKey() {
+  const key = "gym-" + Math.random().toString(36).substring(2, 7) + "-" + Math.random().toString(36).substring(2, 7);
+  document.getElementById("syncKeyInput").value = key;
+  S.gdriveSyncKey = key;
+  saveState();
+}
+
 function handleSyncToggle(checked){
   S.gdriveSyncEnabled = checked;
   saveState();
-  let statusText = document.getElementById("gdriveStatusText");
-  if(statusText) {
-    statusText.innerText = checked ? `Connected (Last sync: ${S.gdriveLastSyncTime})` : "Status: Local Only";
-  }
-  if(checked) {
+  if(checked && S.gdriveSyncKey) {
     fetchDataFromCloudDrive();
+  } else {
+    let statusText = document.getElementById("gdriveStatusText");
+    if(statusText) statusText.innerText = "Status: Local Only";
   }
 }
 
 async function fetchDataFromCloudDrive() {
-  if(!S.gdriveSyncEnabled) return;
+  if(!S.gdriveSyncEnabled || !S.gdriveSyncKey) return;
   let statusText = document.getElementById("gdriveStatusText");
-  if(statusText) statusText.innerText = "Syncing down from Drive...";
+  if(statusText) statusText.innerText = "Syncing profile down...";
   
   try {
-    const response = await fetch(APPS_SCRIPT_URL);
+    const response = await fetch(`${APPS_SCRIPT_URL}?key=${S.gdriveSyncKey}`);
     if(response.ok) {
       const remoteData = await response.json();
-      if(remoteData && remoteData.plan && remoteData.workoutLog) {
+      if(remoteData && remoteData.plan) {
         S = Object.assign(S, remoteData);
         S.gdriveSyncEnabled = true;
         localStorage.setItem(SAVE_KEY, JSON.stringify(S));
         
-        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        S.gdriveLastSyncTime = now;
-        
         loadState();
         renderAllPages();
         if(currentTab === "History") renderCalendar();
-        showSaveToast("Synced down!");
+        showSaveToast("Cloud profile loaded!");
       } else {
-        if(statusText) statusText.innerText = `Connected (Drive empty / New file)`;
+        if(statusText) statusText.innerText = "Connected (New Cloud Slot)";
       }
     }
   } catch (err) {
-    console.error("Cloud data gather fault:", err);
-    if(statusText) statusText.innerText = "Sync failure (Check CORS/Deployment ID)";
+    if(statusText) statusText.innerText = "Sync error connection timed out.";
   }
 }
 
 function triggerCloudAutoSync() {
-  if(!S.gdriveSyncEnabled) return;
+  if(!S.gdriveSyncEnabled || !S.gdriveSyncKey) return;
   
   clearTimeout(syncTimeout);
   let statusText = document.getElementById("gdriveStatusText");
-  if(statusText) statusText.innerText = "Pending auto-save...";
+  if(statusText) statusText.innerText = "Cloud update pending...";
   
   syncTimeout = setTimeout(async () => {
-    if(statusText) statusText.innerText = "Uploading to Cloud...";
     try {
-      const response = await fetch(APPS_SCRIPT_URL, {
+      await fetch(`${APPS_SCRIPT_URL}?key=${S.gdriveSyncKey}`, {
         method: 'POST',
-        mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(S)
       });
-      
       const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      S.gdriveLastSyncTime = now;
-      localStorage.setItem(SAVE_KEY, JSON.stringify(S));
       if(statusText) statusText.innerText = `Connected (Synced at ${now})`;
     } catch(err) {
-      console.error("Cloud Sync Outward push issue:", err);
-      if(statusText) statusText.innerText = "Auto-sync sync write blocked.";
+      if(statusText) statusText.innerText = "Auto-sync update failed.";
     }
   }, 3000);
 }
 
 function triggerManualCloudSync() {
-  showSaveToast("Force syncing cloud...");
+  if(!S.gdriveSyncKey) {
+    alert("Please enter or generate a Sync Key first!");
+    return;
+  }
+  showSaveToast("Syncing account...");
   saveState();
   fetchDataFromCloudDrive();
 }
@@ -738,8 +741,17 @@ function renderAllPages(){
     <div style="margin-top:14px; font-weight:700; font-size:0.8rem; color:var(--ac3); text-transform:uppercase;">Selected Log Metrics & Records</div>
     <div class="selected-day-log" id="selectedDayLogContainer">Select a highlighted day to inspect logged structural items.</div> <br>
      <div class="analytics-box">
-      <div class="analytics-title">☁️ Google Drive Cloud Auto-Sync</div>
+      <div class="analytics-title">☁️ Sync Personal Profile</div>
       
+      <div class="input-group" style="margin-bottom: 10px;">
+        <label>Your Private Sync Key</label>
+        <div style="display:flex; gap:6px;">
+          <input type="text" id="syncKeyInput" value="${S.gdriveSyncKey || ''}" placeholder="e.g., gym-abcde-12345" onchange="S.gdriveSyncKey = this.value.trim(); saveState();" style="flex:1;">
+          <button class="export-btn" onclick="generateRandomSyncKey()" style="padding:0 10px; margin:0;">🎲 New</button>
+        </div>
+        <small style="font-size:0.65rem; color:var(--tx3); margin-top:2px;">Keep this key secret. Enter it on another device to share your layout.</small>
+      </div>
+
       <div class="switch-wrap">
         <span class="switch-label" onclick="document.getElementById('syncGdriveToggle').click()">Enable Cloud Sync</span>
         <label class="switch-box">
@@ -749,15 +761,19 @@ function renderAllPages(){
       </div>
       
       <div id="gdriveStatusText" style="font-size: 0.75rem; color: var(--tx2); margin: 8px 4px 0; font-style: italic;">
-        ${S.gdriveSyncEnabled ? 'Connected (Last sync: ' + S.gdriveLastSyncTime + ')' : 'Status: Local Only'}
+        ${S.gdriveSyncEnabled ? 'Connected' : 'Status: Local Only'}
       </div>
       
       <div class="export-section" style="margin-top:12px; gap: 6px;">
         <button class="export-btn" onclick="exportLocalJSON()">📥 Export Backup</button>
         <button class="export-btn" onclick="document.getElementById('importFile').click()">📤 Import Backup</button>
         <input type="file" id="importFile" class="import-input" onchange="importData(event)">
-        <button class="export-btn gdrive" onclick="triggerManualCloudSync()">🔄 Force Sync Now</button>
+        <button class="export-btn gdrive" onclick="triggerManualCloudSync()">🔄 Sync Now</button>
       </div>
+    </div>
+    <div class="version-card">
+      <span>Build Version</span>
+      <span class="version-tag">v2.0.3</span>
     </div>
   `;
   container.appendChild(hist);
