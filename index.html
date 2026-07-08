@@ -219,7 +219,9 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--ac);box-
 </div>
 <script>
 const SAVE_KEY = "gymtracker_save";
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby-UZMVXGfvWI1hgxcfXi4loHvPM2CEeaccPJtWZQXFaC3vVtFyXly2xwUyJLqL7oV_/exec";
+
+// --- SECURITY WEB PROXY CONFIGURATION ---
+const GOOGLE_PROXY_URL = "https://script.google.com/macros/s/AKfycby-UZMVXGfvWI1hgxcfXi4loHvPM2CEeaccPJtWZQXFaC3vVtFyXly2xwUyJLqL7oV_/exec"; 
 
 const DEFAULT_PLAN = {
   "Monday":["Incline DB Press","Bench Press","Machine Chest Press","Pec Deck","Cable Fly","Plank","Hanging Knee Raise"],
@@ -426,7 +428,9 @@ function loadActiveDayLog(){
 }
 
 function generateRandomSyncKey() {
-  const key = "gym-" + Math.random().toString(36).substring(2, 7) + "-" + Math.random().toString(36).substring(2, 7);
+  const chars = "abcdefghijklmnopqrstuvwxyz";
+  const rStr = (len) => Array.from({length:len}, () => chars[Math.floor(Math.random()*chars.length)]).join("");
+  const key = `gym-${rStr(5)}-${rStr(5)}`;
   document.getElementById("syncKeyInput").value = key;
   S.gdriveSyncKey = key;
   saveState();
@@ -444,16 +448,24 @@ function handleSyncToggle(checked){
 }
 
 async function fetchDataFromCloudDrive() {
-  if(!S.gdriveSyncEnabled || !S.gdriveSyncKey) return;
+  if(!S.gdriveSyncEnabled || !S.gdriveSyncKey || !GOOGLE_PROXY_URL) return;
   let statusText = document.getElementById("gdriveStatusText");
   if(statusText) statusText.innerText = "Syncing profile down...";
   
   try {
-    const response = await fetch(`${APPS_SCRIPT_URL}?key=${S.gdriveSyncKey}`);
+    const response = await fetch(GOOGLE_PROXY_URL, {
+      method: 'POST',
+      mode: 'cors',
+      body: JSON.stringify({
+        action: 'load',
+        userKey: S.gdriveSyncKey
+      })
+    });
+    
     if(response.ok) {
-      const remoteData = await response.json();
-      if(remoteData && remoteData.plan) {
-        S = Object.assign(S, remoteData);
+      const resData = await response.json();
+      if(resData && resData.success && resData.payload) {
+        S = Object.assign(S, resData.payload);
         S.gdriveSyncEnabled = true;
         localStorage.setItem(SAVE_KEY, JSON.stringify(S));
         
@@ -464,14 +476,17 @@ async function fetchDataFromCloudDrive() {
       } else {
         if(statusText) statusText.innerText = "Connected (New Cloud Slot)";
       }
+    } else {
+      if(statusText) statusText.innerText = "Sync failed (Invalid Response)";
     }
   } catch (err) {
+    console.error(err);
     if(statusText) statusText.innerText = "Sync error connection timed out.";
   }
 }
 
 function triggerCloudAutoSync() {
-  if(!S.gdriveSyncEnabled || !S.gdriveSyncKey) return;
+  if(!S.gdriveSyncEnabled || !S.gdriveSyncKey || !GOOGLE_PROXY_URL) return;
   
   clearTimeout(syncTimeout);
   let statusText = document.getElementById("gdriveStatusText");
@@ -479,13 +494,22 @@ function triggerCloudAutoSync() {
   
   syncTimeout = setTimeout(async () => {
     try {
-      await fetch(`${APPS_SCRIPT_URL}?key=${S.gdriveSyncKey}`, {
+      const response = await fetch(GOOGLE_PROXY_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(S)
+        mode: 'cors',
+        body: JSON.stringify({
+          action: 'save',
+          userKey: S.gdriveSyncKey,
+          payload: S
+        })
       });
-      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      if(statusText) statusText.innerText = `Connected (Synced at ${now})`;
+      
+      if(response.ok) {
+        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        if(statusText) statusText.innerText = `Connected (Synced at ${now})`;
+      } else {
+        if(statusText) statusText.innerText = "Auto-sync update failed.";
+      }
     } catch(err) {
       if(statusText) statusText.innerText = "Auto-sync update failed.";
     }
@@ -623,7 +647,7 @@ function renderAllPages(){
       <div class="card">
         <div class="stat-box">
           <div class="stat-val cyan" id="statWaist">--</div>
-          <div class="stat-label">Waist</div>
+          <div class="stat-label">Rest</div>
           <div class="weight-log-row">
             <input type="number" step="0.1" data-id="waist" value="${S.fields["waist"]||""}" placeholder="cm" oninput="saveState();updateDashStats();showSaveToast();">
           </div>
