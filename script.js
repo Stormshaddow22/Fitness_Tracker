@@ -309,7 +309,7 @@ function renderAllPages(){
       <div class="card">
         <div class="stat-box">
           <div class="stat-val cyan" id="statWaist">--</div>
-          <div class="stat-label">Rest</div>
+          <div class="stat-label">Waist</div>
           <div class="weight-log-row">
             <input type="number" step="0.1" data-id="waist" value="${S.fields["waist"]||""}" placeholder="cm" oninput="saveState();updateDashStats();showSaveToast();">
           </div>
