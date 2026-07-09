@@ -1,7 +1,7 @@
 {
   "name": "Gym Tracker",
   "short_name": "Gym",
-  "start_url": "FT2.html",
+  "start_url": "https://stormshaddow22.github.io/Fitness_Tracker/",
   "display": "standalone",
   "background_color": "#060d1b",
   "theme_color": "#060d1b",
