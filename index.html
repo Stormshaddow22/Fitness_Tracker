@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+    <title>Gym Tracker Elite</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <canvas id="confetti"></canvas>
+    <div class="save-toast" id="saveToast"><span class="toast-icon">✓</span> Saved!</div>
+    <header>
+      <div class="header-top">
+        <h1><span class="icon">🏆</span>Gym Tracker ⚡⚡</h1>
+        <div class="header-controls">
+          <button class="save-btn" onclick="toggleTheme()" style="background:rgba(0,188,212,0.12);border-color:rgba(0,188,212,0.3);color:var(--ac2);">🌓 Theme</button>
+          <button class="save-btn" onclick="manualSave()" title="Save now">💾 Save</button>
+        </div>
+      </div>
+      <div class="global-date-container">
+        <label>Log Date:</label>
+        <input type="date" id="globalWorkoutDate" onchange="handleGlobalDateChange()">
+      </div>
+      <div class="streak-row">
+        <div class="streak-badge"><span class="fire">🔥</span><span id="streakCount">0</span> day streak</div>
+        <div class="streak-badge" id="todayBadge" style="display:none;border-color:rgba(0,230,118,0.3);background:linear-gradient(135deg,rgba(0,230,118,0.12),rgba(0,188,212,0.08));color:var(--ac);">✅ Today logged</div>
+      </div>
+      <div class="progress-wrap" id="headerProgressBar">
+        <div class="progress-label"><span id="pctLabel">0%</span><span id="doneCount">0/0 exercises</span></div>
+        <div class="progress"><div class="bar" id="bar"></div></div>
+      </div>
+    </header>
+    <div id="pages"></div>
+    <div class="bottom-nav" id="bottomNav"></div>
+    <button class="timer-btn" id="timerToggle" onclick="toggleTimer()">⏱</button>
+    <div class="timer-overlay" id="timerOverlay">
+      <div class="timer-panel">
+        <button class="timer-close" onclick="toggleTimer()">✕</button>
+        <div style="font-size:1.4rem;">⏱️ Rest Timer</div>
+        <div class="timer-display" id="timerDisplay">1:00</div>
+        <div class="timer-presets">
+          <button class="timer-preset active" onclick="setTimerPreset(60,this)">1 min</button>
+          <button class="timer-preset" onclick="setTimerPreset(90,this)">1:30</button>
+          <button class="timer-preset" onclick="setTimerPreset(120,this)">2 min</button>
+          <button class="timer-preset" onclick="setTimerPreset(180,this)">3 min</button>
+          <button class="timer-preset" onclick="setTimerPreset(300,this)">5 min</button>
+        </div>
+        <div class="timer-controls">
+          <button class="timer-ctrl start" id="timerStartBtn" onclick="startTimer()">Start</button>
+          <button class="timer-ctrl reset" onclick="resetTimer()">Reset</button>
+        </div>
+      </div>
+    </div>
+    <div class="remove-modal-overlay" id="removeModal">
+      <div class="remove-modal">
+        <h3>🗑️ Remove Exercises</h3>
+        <p style="font-size:0.75rem;color:var(--tx2);margin-bottom:8px;">Select exercises to remove from today and future sessions:</p>
+        <div id="removeCheckboxes"></div>
+        <div class="remove-modal-btns">
+          <button class="cancel-btn" onclick="closeRemoveModal()">Cancel</button>
+          <button class="confirm-btn" onclick="confirmRemove()">Remove Selected</button>
+        </div>
+      </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
