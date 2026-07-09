@@ -428,7 +428,7 @@ function renderAllPages(){
     <div class="selected-day-log" id="selectedDayLogContainer">Select a highlighted day to inspect logged structural items.</div> <br>
     <div class="version-card">
       <span>Build Version</span>
-      <span class="version-tag">v3.0.1 (Local)</span>
+      <span class="version-tag">v3.0.1</span>
     </div>
   `;
   container.appendChild(hist);
