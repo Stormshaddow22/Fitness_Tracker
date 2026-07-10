@@ -350,7 +350,7 @@ function renderAllPages(){
         </div>
       </div>
        <div class="card dash-full" style="min-height:auto;">
-        <div class="stat-label" style="text-align:center;margin-bottom:6px;">🥛 H2O Counter</div>
+        <div class="stat-label" style="text-align:center;margin-bottom:6px;"><h1>🥛 H2O Counter</h1></div>
         <div class="water-row" id="waterRow"></div>
       </div>
       <div class="card dash-full" style="min-height:auto;padding-bottom:16px;">
