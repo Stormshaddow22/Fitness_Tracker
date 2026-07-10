@@ -423,11 +423,11 @@ function renderAllPages(){
    <div class="card">
     <div style="display:flex;gap:16px;flex-wrap:wrap;">
       <div class="stat-box" style="flex:1;min-width:100px;">
-        <div class="stat-val green">1</div>
+        <div class="stat-val green">""</div>
         <div class="stat-label">Current Streak</div>
       </div>
       <div class="stat-box" style="flex:1;min-width:100px;">
-        <div class="stat-val cyan" id="histTotal">2</div>
+        <div class="stat-val cyan" id="histTotal">""</div>
         <div class="stat-label">Completed Sessions</div>
       </div>
     </div>
