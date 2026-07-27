@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>License Key Generator (Admin)</title>
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; background: #060d1b; color: #e8edf5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: #111d33; padding: 30px; border-radius: 14px; border: 1px solid #1e3050; width: 400px; box-shadow: 0 4px 24px rgba(0,0,0,0.4); }
+        h2 { margin-top: 0; color: #00e676; font-size: 1.25rem; }
+        label { display: block; margin-top: 15px; font-weight: 600; font-size: 0.75rem; color: #7a8ba8; text-transform: uppercase; }
+        select { width: 100%; padding: 10px; margin-top: 5px; background: #0d1829; border: 1px solid #1e3050; border-radius: 10px; color: #e8edf5; font-family: inherit; }
+        button { width: 100%; background: #00e676; color: #060d1b; border: none; padding: 12px; margin-top: 20px; border-radius: 10px; font-size: 0.9rem; font-weight: 700; cursor: pointer; transition: 0.2s; }
+        button:hover { background: #00c853; }
+        .output-box { margin-top: 20px; background: #0d1829; border: 1px solid #1e3050; padding: 12px; border-radius: 10px; word-break: break-all; font-family: monospace; text-align: center; color: #00bcd4; font-size: 1.1rem; }
+        #status { margin-top: 10px; font-weight: 700; font-size: 0.8rem; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>🔑 License Key Generator</h2>
+    
+    <label for="duration">Subscription Duration:</label>
+    <select id="duration">
+   				 <option value="1">1 Day</option>
+        <option value="7">7 Days</option>
+        <option value="30" selected>30 Days (1 Month)</option>
+        <option value="90">90 Days (3 Months)</option>
+        <option value="365">365 Days (1 Year)</option>
+    </select>
+
+    <button onclick="createAndSaveKey()">Generate & Save Key</button>
+
+    <div class="output-box" id="key-display">-- -- --</div>
+    <div id="status"></div>
+</div> 
+
+<script>
+function generateRandomKey() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let segment = () => Array.from({length: 2}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    return `${segment()}-${segment()}-${segment()}-${segment()}`;
+}
+
+async function createAndSaveKey() {
+    // Replace with your Script #2 (Admin Generator URL)
+    const adminWebAppUrl = 'https://script.google.com/macros/s/AKfycbw8FkI4EkCUS5NpN3BBJqNAd-_lZ6cKTPJSDWyzeyYwxlZXAqL6oFK6ckVu9RD8DiUs0Q/exec'; 
+    const adminSecret = "MY_SUPER_SECRET_ADMIN_PASSWORD_123"; 
+    const durationDays = document.getElementById('duration').value;
+    const statusEl = document.getElementById('status');
+    const displayEl = document.getElementById('key-display');
+    
+    const newKey = generateRandomKey();
+    displayEl.innerText = newKey;
+    statusEl.innerText = "Saving to Google Sheet...";
+    statusEl.style.color = "#ffab40";
+
+    try {
+        const response = await fetch(adminWebAppUrl, {
+            method: 'POST',
+            body: JSON.stringify({
+                adminSecret: adminSecret,
+                licenseKey: newKey,
+                durationDays: durationDays
+            })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            statusEl.innerText = "Success! Key added to sheet.";
+            statusEl.style.color = "#00e676";
+        } else {
+            statusEl.innerText = "Error: " + data.message;
+            statusEl.style.color = "#ff5252";
+        }
+    } catch (error) {
+        statusEl.innerText = "Network Error: " + error;
+        statusEl.style.color = "#ff5252";
+    }
+}
+</script>
+
+</body>
+</html>
