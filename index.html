@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<!-- PWA Manifest & Mobile Meta Tags -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#060d1b">
+<link rel="apple-touch-icon" href="icon-192.png">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+    <title>Gym Tracker - My Routine</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="saveToast" class="save-toast">✓ Saved!</div>
+
+    <!-- SETTINGS DRAWER MENU -->
+    <div id="settingsOverlay" class="settings-overlay" onclick="toggleSettingsMenu()"></div>
+    <div id="settingsDrawer" class="settings-drawer">
+      <div class="drawer-header">
+        <h3>⚙️ Settings</h3>
+        <button class="close-btn" onclick="toggleSettingsMenu()">✕</button>
+      </div>
+      <div class="drawer-body">
+        <div class="setting-item">
+          <label>Actions</label>
+          <button class="menu-action-btn" onclick="manualSave(); toggleSettingsMenu();">💾 Save Data</button>
+        </div>
+        <div class="setting-item">
+          <label>Appearance</label>
+          <button class="menu-action-btn" onclick="toggleTheme()">🌓 Toggle Theme</button>
+        </div>
+        <div class="setting-item">
+  <label>Cloud Sync</label>
+  <button class="menu-action-btn" onclick="handleGoogleLogin()">🌐 Sign in with Google</button>
+  <button class="menu-action-btn" onclick="saveDataToDrive()" style="margin-top:6px;">☁️ Backup to Drive</button>
+</div>
+        <div class="setting-item">
+          <label for="activationKeyInput">Activation Key</label>
+          <input type="text" id="activationKeyInput" data-id="activationKey" placeholder="Enter key..." oninput="saveState(); verifyActivationKey();">
+          <div id="keyStatus" style="font-size:0.7rem;margin-top:4px;font-weight:700;color:var(--tx2);">Not verified</div>
+        </div>
+      </div>
+    </div>
+
+    <header>
+      <div class="header-top">
+        <h1>🏆 Gym Tracker <span class="lightning">⚡⚡</span></h1>
+        <div class="header-controls">
+          <button class="hamburger-btn" onclick="toggleSettingsMenu()">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+        </div>
+      </div>
+      <div class="global-date-container">
+        <label>LOG DATE:</label>
+        <input type="date" id="globalWorkoutDate" onchange="handleGlobalDateChange()">
+      </div>
+      
+    </header>
+
+    <div class="page-content">
+      <div class="card quote-card">
+        <div class="quote-text">"Don't count the days, make the days count."</div>
+        <div class="quote-author">— Muhammad Ali</div>
+      </div>
+
+      <div class="dash-grid">
+        <div class="card">
+          <div class="stat-box">
+            <div class="stat-val green" id="statWeight">--</div>
+            <div class="stat-label">Weight</div>
+            <input type="number" step="0.1" data-id="weight" placeholder="kg" oninput="saveState();updateDashStats();">
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="stat-box">
+            <div class="stat-val cyan" id="statWaist">--</div>
+            <div class="stat-label">Main Waist</div>
+            <input type="number" step="0.1" data-id="waist" placeholder="In" oninput="saveState();updateDashStats();">
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="stat-box">
+            <div class="stat-val purple" id="statProtein">--</div>
+            <div class="stat-label">Protein Intake</div>
+            <input type="number" data-id="protein" placeholder="grams" oninput="saveState();updateDashStats();">
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="stat-box">
+            <div class="stat-val orange" id="statSteps">--</div>
+            <div class="stat-label">Daily Steps</div>
+            <input type="number" data-id="steps" placeholder="steps" oninput="saveState();updateDashStats();">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="stat-label" style="text-align:center;">🥛 H2O Counter</div>
+        <div class="water-row" id="waterRow"></div>
+      </div>
+
+      <div class="card">
+        <div style="font-size:0.7rem;font-weight:900;color:var(--ac3);margin-bottom:10px;">🏆 PERSONAL RECORDS (PR TRACKER)</div>
+        <div class="pr-grid" id="prGridContainer"></div>
+      </div>
+    </div>
+
+    <nav class="bottom-nav">
+      <a href="index.html" class="nav-link active">
+        <span class="nav-icon">🍎</span>
+        <span>My Routine</span>
+      </a>
+      <a href="workout.html" class="nav-link">
+        <span class="nav-icon">🏋️</span>
+        <span>Workout</span>
+      </a>
+      <a href="history.html" class="nav-link">
+        <span class="nav-icon">📅</span>
+        <span>History</span>
+      </a>
+    </nav>
+
+    <script>window.CURRENT_PAGE = 'Dashboard';</script>
+    <script src="script.js"></script>
+</body>
+</html>

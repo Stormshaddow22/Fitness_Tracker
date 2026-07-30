@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<!-- PWA Manifest & Mobile Meta Tags -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#060d1b">
+<link rel="apple-touch-icon" href="icon-192.png">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+    <title>Gym Tracker - History</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="saveToast" class="save-toast">✓ Saved!</div>
+
+    <!-- SETTINGS DRAWER MENU -->
+    <div id="settingsOverlay" class="settings-overlay" onclick="toggleSettingsMenu()"></div>
+    <div id="settingsDrawer" class="settings-drawer">
+      <div class="drawer-header">
+        <h3>⚙️ Settings</h3>
+        <button class="close-btn" onclick="toggleSettingsMenu()">✕</button>
+      </div>
+      <div class="drawer-body">
+        <div class="setting-item">
+          <label>Actions</label>
+          <button class="menu-action-btn" onclick="manualSave(); toggleSettingsMenu();">💾 Save Data</button>
+        </div>
+        <div class="setting-item">
+          <label>Appearance</label>
+          <button class="menu-action-btn" onclick="toggleTheme()">🌓 Toggle Theme</button>
+        </div>
+        <div class="setting-item">
+  <label>Cloud Sync</label>
+  <button class="menu-action-btn" onclick="handleGoogleLogin()">🌐 Sign in with Google</button>
+  <button class="menu-action-btn" onclick="saveDataToDrive()" style="margin-top:6px;">☁️ Backup to Drive</button>
+</div>
+        <div class="setting-item">
+          <label for="activationKeyInput">Activation Key</label>
+          <input type="text" id="activationKeyInput" data-id="activationKey" placeholder="Enter key..." oninput="saveState(); verifyActivationKey();">
+          <div id="keyStatus" style="font-size:0.7rem;margin-top:4px;font-weight:700;color:var(--tx2);">Not verified</div>
+        </div>
+      </div>
+    </div>
+
+    <header>
+      <div class="header-top">
+        <h1>🏆 Gym Tracker <span class="lightning">⚡⚡</span></h1>
+        <div class="streak-row">
+        <div class="streak-badge">🔥 <span id="streakCount">""</span> day streak</div>
+      </div>
+        <div class="header-controls">
+          <button class="hamburger-btn" onclick="toggleSettingsMenu()">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+        </div>
+      </div>
+    
+      
+    </header>
+
+    <div class="page-content">
+      <div class="calendar-wrapper">
+        <div class="calendar-header">
+          <button class="calendar-nav-btn" onclick="changeMonth(-1)">◀</button>
+          <div class="calendar-month-title" id="calMonthTitle">July 2026</div>
+          <button class="calendar-nav-btn" onclick="changeMonth(1)">▶</button>
+        </div>
+        <div class="calendar-grid" id="calendarGrid"></div>
+      </div>
+
+      <div style="margin-top:16px;font-size:0.7rem;font-weight:900;color:var(--ac3);">COMPLETED RECORDS</div>
+      <div class="card" style="margin-top:8px;" id="selectedDayLogContainer">
+        Select a highlighted day to inspect logged structural items.
+      </div>
+
+      
+    </div>
+
+    <nav class="bottom-nav">
+      <a href="index.html" class="nav-link">
+        <span class="nav-icon">🍎</span>
+        <span>My Routine</span>
+      </a>
+      <a href="workout.html" class="nav-link">
+        <span class="nav-icon">🏋️</span>
+        <span>Workout</span>
+      </a>
+      <a href="history.html" class="nav-link active">
+        <span class="nav-icon">📅</span>
+        <span>History</span>
+      </a>
+    </nav>
+
+    <script>window.CURRENT_PAGE = 'History';</script>
+    <script src="script.js"></script>
+</body>
+</html>
