@@ -65,7 +65,7 @@ function toggleSettingsMenu() {
   overlay.classList.toggle("show");
 }
 
-/* --- LICENSE KEY VERIFICATION PROCESS --- */
+/* --- UPDATED LICENSE KEY VERIFICATION PROCESS --- */
 async function verifyActivationKey() {
   const keyInput = document.getElementById("activationKeyInput");
   const statusEl = document.getElementById("keyStatus");
@@ -78,17 +78,29 @@ async function verifyActivationKey() {
     return;
   }
 
+  if (!gUserEmail) {
+    statusEl.innerText = "❌ Please connect Google account first";
+    statusEl.style.color = "var(--red)";
+    return;
+  }
+
   statusEl.innerText = "Verifying with Google Sheets...";
   statusEl.style.color = "var(--ac2)";
 
   try {
-    const response = await fetch(`${LICENSE_API_URL}?key=${encodeURIComponent(key)}`);
+    const response = await fetch(LICENSE_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ licenseKey: key, email: gUserEmail })
+    });
+    
     const data = await response.json();
-    if (data.valid) {
-      statusEl.innerText = `✓ Valid (Expires: ${data.expiry || 'Active'})`;
+    if (data.success) {
+      statusEl.innerText = `✓ Valid & Bound to ${gUserEmail}`;
       statusEl.style.color = "var(--ac)";
+      saveState();
     } else {
-      statusEl.innerText = "❌ Expired or Invalid Key";
+      statusEl.innerText = `❌ ${data.message || "Invalid Key"}`;
       statusEl.style.color = "var(--red)";
     }
   } catch (err) {
@@ -97,6 +109,51 @@ async function verifyActivationKey() {
   }
 }
 
+/* --- UPDATED GOOGLE AUTH INIT & UI REFLECT --- */
+function initGoogleAuth() {
+  if (typeof google === 'undefined' || !google.accounts) return;
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/oauth2/v3/userinfo.email',
+    callback: async (response) => {
+      if (response.error !== undefined) {
+        alert("Authentication failed.");
+        return;
+      }
+      gUserAccessToken = response.access_token;
+      await fetchUserInfo();
+      await loadDataFromDrive();
+    },
+  });
+}
+
+async function fetchUserInfo() {
+  try {
+    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${gUserAccessToken}` }
+    });
+    const data = await res.json();
+    gUserEmail = data.email;
+    
+    // Update button text to "Reconnect" and display email in box
+    const loginBtn = document.getElementById("googleLoginBtn");
+    if (loginBtn) loginBtn.innerText = "🔄 Reconnect Google Account";
+
+    const emailBox = document.getElementById("googleEmailDisplay");
+    if (emailBox) {
+      emailBox.style.display = "block";
+      emailBox.innerText = `Connected: ${gUserEmail}`;
+    }
+
+    // Re-verify key automatically once email is secured
+    const keyInput = document.getElementById("activationKeyInput");
+    if (keyInput && keyInput.value.trim()) {
+      verifyActivationKey();
+    }
+  } catch (err) {
+    console.error("Failed to fetch user info", err);
+  }
+}
 
 /* --- STATE STORAGE & AUTO-SYNC --- */
 let driveSyncTimeout = null;
@@ -620,3 +677,95 @@ async function loadDataFromDrive() {
 window.addEventListener('load', () => {
   setTimeout(initGoogleAuth, 500);
 });
+
+/* --- REST TIMER MODAL LOGIC --- */
+let timerInterval = null;
+let timeLeft = 60;
+let totalTimerSeconds = 60;
+
+function toggleTimer() {
+  const overlay = document.getElementById("timerOverlay");
+  if (!overlay) return;
+  overlay.classList.toggle("show");
+}
+
+function setTimerPreset(seconds, btn) {
+  totalTimerSeconds = seconds;
+  timeLeft = seconds;
+  updateTimerDisplay();
+
+  document.querySelectorAll(".timer-preset").forEach(p => p.classList.remove("active"));
+  if (btn) btn.classList.add("active");
+}
+
+function updateTimerDisplay() {
+  const display = document.getElementById("timerDisplay");
+  if (!display) return;
+  const mins = Math.floor(timeLeft / 60);
+  const secs = timeLeft % 60;
+  display.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+}
+
+function playTimerBeep() {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // Play first beep
+    playTone(audioCtx, 880, 0, 0.3);
+    // Play second beep after a short pause
+    playTone(audioCtx, 880, 0.4, 0.3);
+  } catch (e) {
+    console.log("Audio Context not supported or blocked");
+  }
+}
+
+function playTone(audioCtx, frequency, delay, duration) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(frequency, audioCtx.currentTime + delay);
+  
+  gain.gain.setValueAtTime(0.1, audioCtx.currentTime + delay);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + duration);
+  
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  
+  osc.start(audioCtx.currentTime + delay);
+  osc.stop(audioCtx.currentTime + delay + duration);
+}
+
+function startTimer() {
+  const startBtn = document.getElementById("timerStartBtn");
+  if (timerInterval) {
+    // Pause timer
+    clearInterval(timerInterval);
+    timerInterval = null;
+    if (startBtn) startBtn.innerText = "Start";
+    return;
+  }
+
+  if (timeLeft <= 0) timeLeft = totalTimerSeconds;
+  if (startBtn) startBtn.innerText = "Pause";
+
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    updateTimerDisplay();
+    if (timeLeft <= 0) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+      if (startBtn) startBtn.innerText = "Start";
+      playTimerBeep();
+    }
+  }, 1000);
+}
+
+function resetTimer() {
+  clearInterval(timerInterval);
+  timerInterval = null;
+  timeLeft = totalTimerSeconds;
+  updateTimerDisplay();
+  const startBtn = document.getElementById("timerStartBtn");
+  if (startBtn) startBtn.innerText = "Start";
+}

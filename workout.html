@@ -9,7 +9,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
     <title>Gym Tracker - Workout</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://stormshaddow22.github.io/Fitness_Tracker/styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -34,7 +34,8 @@
         
         <div class="setting-item">
   <label>Cloud Sync</label>
-  <button class="menu-action-btn" onclick="handleGoogleLogin()">🌐 Sign in with Google</button>
+  <button class="menu-action-btn" id="googleLoginBtn" onclick="handleGoogleLogin()">🌐 Sign in with Google</button>
+  <div id="googleEmailDisplay" style="display:none; background:var(--inp); border:1px solid var(--bdr); border-radius:8px; padding:8px; font-size:0.75rem; color:var(--ac2); font-weight:700; word-break:break-all; margin-top:4px;"></div>
   <button class="menu-action-btn" onclick="saveDataToDrive()" style="margin-top:6px;">☁️ Backup to Drive</button>
 </div>
         <div class="setting-item">
@@ -102,7 +103,26 @@
       <div id="exerciseListContainer"></div>
     </div>
 
-    <button class="timer-btn" onclick="alert('Rest Timer')">⏱</button>
+<!-- Timer button updated -->
+    <button class="timer-btn" id="timerToggle" onclick="toggleTimer()">⏱</button>
+    <div class="timer-overlay" id="timerOverlay">
+      <div class="timer-panel">
+        <button class="timer-close" onclick="toggleTimer()">✕</button>
+        <div style="font-size:1.4rem;">⏱️ Rest Timer</div>
+        <div class="timer-display" id="timerDisplay">1:00</div>
+        <div class="timer-presets">
+          <button class="timer-preset active" onclick="setTimerPreset(60,this)">1 min</button>
+          <button class="timer-preset" onclick="setTimerPreset(90,this)">1:30</button>
+          <button class="timer-preset" onclick="setTimerPreset(120,this)">2 min</button>
+          <button class="timer-preset" onclick="setTimerPreset(180,this)">3 min</button>
+          <button class="timer-preset" onclick="setTimerPreset(300,this)">5 min</button>
+        </div>
+        <div class="timer-controls">
+          <button class="timer-ctrl start" id="timerStartBtn" onclick="startTimer()">Start</button>
+          <button class="timer-ctrl reset" onclick="resetTimer()">Reset</button>
+        </div>
+      </div>
+    </div>
 
     <nav class="bottom-nav">
       <a href="index.html" class="nav-link">
