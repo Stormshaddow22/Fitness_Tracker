@@ -28,6 +28,8 @@ let S = {
   theme: "dark"
 };
 
+let isSessionVerified = false;
+
 /* --- TOAST & THEME --- */
 function showSaveToast() {
   const t = document.getElementById("saveToast");
@@ -65,26 +67,76 @@ function toggleSettingsMenu() {
   overlay.classList.toggle("show");
 }
 
-/* --- UPDATED LICENSE KEY VERIFICATION PROCESS --- */
-async function verifyActivationKey() {
-  const keyInput = document.getElementById("activationKeyInput");
-  const statusEl = document.getElementById("keyStatus");
+/* --- OVERLAY & SESSION VALIDATION LOGIC --- */
+function checkSessionVerification() {
+  const overlay = document.getElementById("activationOverlay");
+  const savedKey = localStorage.getItem("gym_license_key");
+  
+  if (isSessionVerified && savedKey && gUserEmail) {
+    if (overlay) overlay.style.display = "none";
+    updateSettingsDisplay();
+  } else {
+    if (overlay) overlay.style.display = "flex";
+    if (savedKey) {
+      const overlayInput = document.getElementById("overlayKeyInput");
+      if (overlayInput) overlayInput.value = savedKey;
+    }
+    if (gUserEmail) {
+      updateGoogleAuthUIStates();
+    }
+  }
+}
+
+function updateGoogleAuthUIStates() {
+  const overlayGoogleBtn = document.getElementById("overlayGoogleBtn");
+  const overlayEmailDisplay = document.getElementById("overlayEmailDisplay");
+  if (gUserEmail) {
+    if (overlayGoogleBtn) overlayGoogleBtn.innerText = "🔄 Reconnect Google Account";
+    if (overlayEmailDisplay) {
+      overlayEmailDisplay.style.display = "block";
+      overlayEmailDisplay.innerText = `Connected: ${gUserEmail}`;
+    }
+  }
+  updateSettingsDisplay();
+}
+
+function updateSettingsDisplay() {
+  const statusEl = document.getElementById("settingsAccountStatus");
+  const googleBtn = document.getElementById("settingsGoogleBtn");
+  const keyDisplay = document.getElementById("settingsActiveKeyDisplay");
+  
+  if (statusEl) {
+    statusEl.innerText = gUserEmail ? `Connected as: ${gUserEmail}` : "Google Account not connected";
+  }
+  if (googleBtn) {
+    googleBtn.innerText = gUserEmail ? "🔄 Reconnect Google Account" : "🌐 Connect Google Account";
+  }
+  if (keyDisplay) {
+    const savedKey = localStorage.getItem("gym_license_key");
+    keyDisplay.innerText = savedKey ? savedKey : "None";
+  }
+}
+
+async function overlayVerifyAndUnlock() {
+  const keyInput = document.getElementById("overlayKeyInput");
+  const statusEl = document.getElementById("overlayKeyStatus");
   if (!keyInput || !statusEl) return;
 
   const key = keyInput.value.trim();
+  
+  if (!gUserEmail) {
+    statusEl.innerText = "❌ Please connect your Google account first!";
+    statusEl.style.color = "var(--red)";
+    return;
+  }
+  
   if (!key) {
-    statusEl.innerText = "⚠️ Enter a license key";
+    statusEl.innerText = "⚠️ Please enter a license key.";
     statusEl.style.color = "var(--orn)";
     return;
   }
 
-  if (!gUserEmail) {
-    statusEl.innerText = "❌ Please connect Google account first";
-    statusEl.style.color = "var(--red)";
-    return;
-  }
-
-  statusEl.innerText = "Verifying with Google Sheets...";
+  statusEl.innerText = "Verifying key...";
   statusEl.style.color = "var(--ac2)";
 
   try {
@@ -96,62 +148,23 @@ async function verifyActivationKey() {
     
     const data = await response.json();
     if (data.success) {
-      statusEl.innerText = `✓ Valid & Bound to ${gUserEmail}`;
+      isSessionVerified = true;
+      localStorage.setItem("gym_license_key", key);
+      statusEl.innerText = "✓ Success! Unlocking...";
       statusEl.style.color = "var(--ac)";
-      saveState();
+      
+      setTimeout(() => {
+        const overlay = document.getElementById("activationOverlay");
+        if (overlay) overlay.style.display = "none";
+        updateSettingsDisplay();
+      }, 800);
     } else {
       statusEl.innerText = `❌ ${data.message || "Invalid Key"}`;
       statusEl.style.color = "var(--red)";
     }
   } catch (err) {
-    statusEl.innerText = "❌ Connection Error";
+    statusEl.innerText = "❌ Connection error during validation.";
     statusEl.style.color = "var(--red)";
-  }
-}
-
-/* --- UPDATED GOOGLE AUTH INIT & UI REFLECT --- */
-function initGoogleAuth() {
-  if (typeof google === 'undefined' || !google.accounts) return;
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: GOOGLE_CLIENT_ID,
-    scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/oauth2/v3/userinfo.email',
-    callback: async (response) => {
-      if (response.error !== undefined) {
-        alert("Authentication failed.");
-        return;
-      }
-      gUserAccessToken = response.access_token;
-      await fetchUserInfo();
-      await loadDataFromDrive();
-    },
-  });
-}
-
-async function fetchUserInfo() {
-  try {
-    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: `Bearer ${gUserAccessToken}` }
-    });
-    const data = await res.json();
-    gUserEmail = data.email;
-    
-    // Update button text to "Reconnect" and display email in box
-    const loginBtn = document.getElementById("googleLoginBtn");
-    if (loginBtn) loginBtn.innerText = "🔄 Reconnect Google Account";
-
-    const emailBox = document.getElementById("googleEmailDisplay");
-    if (emailBox) {
-      emailBox.style.display = "block";
-      emailBox.innerText = `Connected: ${gUserEmail}`;
-    }
-
-    // Re-verify key automatically once email is secured
-    const keyInput = document.getElementById("activationKeyInput");
-    if (keyInput && keyInput.value.trim()) {
-      verifyActivationKey();
-    }
-  } catch (err) {
-    console.error("Failed to fetch user info", err);
   }
 }
 
@@ -190,7 +203,6 @@ function saveState() {
   localStorage.setItem(SAVE_KEY, JSON.stringify(S));
   showSaveToast();
 
-  // Automatically sync to Google Drive in the background (debounced by 3 seconds)
   if (gUserAccessToken) {
     clearTimeout(driveSyncTimeout);
     driveSyncTimeout = setTimeout(() => {
@@ -219,13 +231,8 @@ function loadState() {
     document.getElementById("streakCount").innerText = S.streak.count || 1;
   }
 
-  const actKeyInput = document.getElementById("activationKeyInput");
-  if (actKeyInput && S.fields["activationKey"] !== undefined) {
-    actKeyInput.value = S.fields["activationKey"];
-    verifyActivationKey();
-  }
-
   renderPageSpecifics();
+  checkSessionVerification();
 }
 
 function handleGlobalDateChange() {
@@ -362,7 +369,6 @@ function promptAddExercise() {
   }
 }
 
-/* --- REMOVE EXERCISES MODAL LOGIC --- */
 function openRemoveModal() {
   const exercises = S.plan[S.currentRoutine] || [];
   if (exercises.length === 0) {
@@ -523,16 +529,6 @@ function inspectDayLog(dateStr) {
   container.innerHTML = html;
 }
 
-window.onload = loadState;
-
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
-      .then(reg => console.log('PWA Service Worker Registered! Scope:', reg.scope))
-      .catch(err => console.log('Service Worker Registration Failed:', err));
-  });
-}
-
 /* --- GOOGLE AUTH & DRIVE SYNC --- */
 let tokenClient;
 let gUserAccessToken = null;
@@ -544,7 +540,7 @@ function initGoogleAuth() {
   if (typeof google === 'undefined' || !google.accounts) return;
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: GOOGLE_CLIENT_ID,
-    scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email',
+    scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/oauth2/v3/userinfo.email',
     callback: async (response) => {
       if (response.error !== undefined) {
         alert("Authentication failed.");
@@ -573,7 +569,7 @@ async function fetchUserInfo() {
     });
     const data = await res.json();
     gUserEmail = data.email;
-    console.log("Logged in user email:", gUserEmail);
+    updateGoogleAuthUIStates();
   } catch (err) {
     console.error("Failed to fetch user info", err);
   }
@@ -651,7 +647,6 @@ async function saveDataToDriveSilent() {
         body: form
       });
     }
-    console.log("Auto-backed up to Google Drive successfully.");
   } catch (err) {
     console.error("Auto-sync failed", err);
   }
@@ -673,10 +668,6 @@ async function loadDataFromDrive() {
     showSaveToast();
   }
 }
-
-window.addEventListener('load', () => {
-  setTimeout(initGoogleAuth, 500);
-});
 
 /* --- REST TIMER MODAL LOGIC --- */
 let timerInterval = null;
@@ -709,10 +700,7 @@ function updateTimerDisplay() {
 function playTimerBeep() {
   try {
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    
-    // Play first beep
     playTone(audioCtx, 880, 0, 0.3);
-    // Play second beep after a short pause
     playTone(audioCtx, 880, 0.4, 0.3);
   } catch (e) {
     console.log("Audio Context not supported or blocked");
@@ -739,7 +727,6 @@ function playTone(audioCtx, frequency, delay, duration) {
 function startTimer() {
   const startBtn = document.getElementById("timerStartBtn");
   if (timerInterval) {
-    // Pause timer
     clearInterval(timerInterval);
     timerInterval = null;
     if (startBtn) startBtn.innerText = "Start";
@@ -768,4 +755,16 @@ function resetTimer() {
   updateTimerDisplay();
   const startBtn = document.getElementById("timerStartBtn");
   if (startBtn) startBtn.innerText = "Start";
+}
+
+window.onload = () => {
+  loadState();
+  setTimeout(initGoogleAuth, 500);
+};
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .catch(err => console.log('Service Worker Registration Failed:', err));
+  });
 }

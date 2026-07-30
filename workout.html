@@ -13,6 +13,24 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
 </head>
 <body>
+<!-- Full-Screen Activation & Google Login Overlay -->
+<div id="activationOverlay" style="position: fixed; inset: 0; background: rgba(15, 15, 19, 0.95); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center;">
+  <div style="background: var(--card); border: 1px solid var(--bdr); border-radius: 16px; padding: 24px; max-width: 400px; width: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    <h2 style="color: var(--txt); margin-bottom: 8px;">🔒 Session Locked</h2>
+    <p style="color: var(--txt-sub); font-size: 0.9rem; margin-bottom: 20px;">Please connect your Google account and validate your activation key to continue.</p>
+    
+    <button class="menu-action-btn" id="overlayGoogleBtn" onclick="handleGoogleLogin()" style="width: 100%; padding: 12px; margin-bottom: 12px; font-weight: bold;">🌐 Connect Google Account</button>
+    <div id="overlayEmailDisplay" style="display: none; font-size: 0.8rem; color: var(--ac2); margin-bottom: 16px; word-break: break-all;"></div>
+    
+    <div style="margin-bottom: 12px;">
+      <input type="text" id="overlayKeyInput" placeholder="Enter License Key" style="width: 100%; padding: 10px; background: var(--inp); border: 1px solid var(--bdr); border-radius: 8px; color: var(--txt); text-align: center; margin-bottom: 8px;">
+      <button class="menu-action-btn" onclick="overlayVerifyAndUnlock()" style="width: 100%; padding: 12px; background: var(--ac); color: #000; font-weight: bold;">Validate Key & Unlock</button>
+    </div>
+    
+    <div id="overlayKeyStatus" style="font-size: 0.8rem; margin-top: 8px; color: var(--orn);"></div>
+  </div>
+</div>
+
     <div id="saveToast" class="save-toast">✓ Saved!</div>
 
     <!-- SETTINGS DRAWER MENU -->
@@ -33,15 +51,17 @@
         </div>
         
         <div class="setting-item">
-  <label>Cloud Sync</label>
-  <button class="menu-action-btn" id="googleLoginBtn" onclick="handleGoogleLogin()">🌐 Sign in with Google</button>
-  <div id="googleEmailDisplay" style="display:none; background:var(--inp); border:1px solid var(--bdr); border-radius:8px; padding:8px; font-size:0.75rem; color:var(--ac2); font-weight:700; word-break:break-all; margin-top:4px;"></div>
-  <button class="menu-action-btn" onclick="saveDataToDrive()" style="margin-top:6px;">☁️ Backup to Drive</button>
-</div>
+          <label>Account & License</label>
+          <div id="settingsAccountStatus" style="font-size: 0.8rem; color: var(--txt-sub); margin-bottom: 6px;">Not connected</div>
+          <button class="menu-action-btn" id="settingsGoogleBtn" onclick="handleGoogleLogin()">🌐 Connect / Reconnect Google</button>
+          
+          <div style="margin-top: 10px;">
+            <label style="font-size: 0.75rem; color: var(--txt-sub);">Active Key:</label>
+            <div id="settingsActiveKeyDisplay" style="background: var(--inp); border: 1px solid var(--bdr); border-radius: 8px; padding: 8px; font-size: 0.8rem; color: var(--ac); word-break: break-all; margin-top: 2px;">None</div>
+          </div>
+        </div>
         <div class="setting-item">
-          <label for="activationKeyInput">Activation Key</label>
-          <input type="text" id="activationKeyInput" data-id="activationKey" placeholder="Enter key..." oninput="saveState(); verifyActivationKey();">
-          <div id="keyStatus" style="font-size:0.7rem;margin-top:4px;font-weight:700;color:var(--tx2);">Not verified</div>
+          <button class="menu-action-btn" onclick="saveDataToDrive()" style="margin-top:6px;">☁️ Backup to Drive</button>
         </div>
       </div>
     </div>
@@ -54,9 +74,7 @@
         <button class="close-btn" onclick="closeRemoveModal()">✕</button>
       </div>
       <div class="drawer-body" style="flex: 1; overflow-y: auto; margin-bottom: 15px;">
-        <div id="removeModalList" style="display: flex; flex-direction: column; gap: 8px;">
-          <!-- Checkbox items populated dynamically -->
-        </div>
+        <div id="removeModalList" style="display: flex; flex-direction: column; gap: 8px;"></div>
       </div>
       <button class="complete-all-btn" style="background-color: var(--red, #ff4d4d); width: 100%; padding: 12px;" onclick="confirmRemoveSelected()">Delete Selected</button>
     </div>
@@ -64,10 +82,6 @@
     <header>
       <div class="header-top">
         <h1>🏆 Gym Tracker <span class="lightning">⚡⚡</span></h1>
-        <div class="setting-item">
-          <button class="menu-action-btn" onclick="manualSave(); ">💾 Save Data</button>
-        </div>
-        
         <div class="header-controls">
           <button class="hamburger-btn" onclick="toggleSettingsMenu()">
             <span></span>
@@ -103,7 +117,6 @@
       <div id="exerciseListContainer"></div>
     </div>
 
-<!-- Timer button updated -->
     <button class="timer-btn" id="timerToggle" onclick="toggleTimer()">⏱</button>
     <div class="timer-overlay" id="timerOverlay">
       <div class="timer-panel">
