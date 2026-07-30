@@ -359,15 +359,15 @@ function toggleCompleteAll() {
   const button = document.getElementById('completeAllBtn');
   
   const allAreCompleted = exercises.every(ex => S.fields[`chk_${ex}`] === true);
+  const newState = !allAreCompleted;
 
   exercises.forEach(ex => {
-    const newState = !allAreCompleted;
     S.fields[`chk_${ex}`] = newState;
     const chk = document.getElementById(`chk_${ex}`);
     if (chk) chk.checked = newState;
   });
 
-  if (!allAreCompleted) {
+  if (newState) {
     button.textContent = "Unselect All";
   } else {
     button.textContent = "Complete All";
