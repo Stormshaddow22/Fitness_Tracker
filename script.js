@@ -1,3 +1,24 @@
+function parseJwt(token) {
+    var base64Url = token.split('.')[1];
+    var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    var jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+        return '%' + ('0' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+}
+
+// When Google Sign-In succeeds:
+function handleCredentialResponse(response) {
+    const responsePayload = parseJwt(response.credential);
+    
+    gUserEmail = responsePayload.email; // Extracted safely!
+    console.log("Logged in user email:", gUserEmail);
+    
+    // Save email and update states
+    localStorage.setItem('userEmail', gUserEmail);
+    updateGoogleAuthUIStates();
+}
+
 const SAVE_KEY = "gymtracker_save";
 
 // Google Sheets Web App URL for license key validation 
@@ -71,6 +92,8 @@ function toggleSettingsMenu() {
 function checkSessionVerification() {
   const overlay = document.getElementById("activationOverlay");
   const savedKey = localStorage.getItem("gym_license_key");
+  const storedEmail = localStorage.getItem("userEmail");
+  if (storedEmail) gUserEmail = storedEmail;
   
   if (isSessionVerified && savedKey && gUserEmail) {
     if (overlay) overlay.style.display = "none";
@@ -118,26 +141,31 @@ function updateSettingsDisplay() {
 }
 
 async function overlayVerifyAndUnlock() {
-  const keyInput = document.getElementById("overlayKeyInput");
-  const statusEl = document.getElementById("overlayKeyStatus");
-  if (!keyInput || !statusEl) return;
+  const keyInputEl = document.getElementById('overlayKeyInput');
+  const statusDiv = document.getElementById('overlayKeyStatus');
 
-  const key = keyInput.value.trim();
+  const key = keyInputEl ? keyInputEl.value.trim() : "";
   
   if (!gUserEmail) {
-    statusEl.innerText = "❌ Please connect your Google account first!";
-    statusEl.style.color = "var(--red)";
+    if (statusDiv) {
+      statusDiv.innerText = "❌ Please connect your Google account first!";
+      statusDiv.style.color = "var(--red)";
+    }
     return;
   }
   
   if (!key) {
-    statusEl.innerText = "⚠️ Please enter a license key.";
-    statusEl.style.color = "var(--orn)";
+    if (statusDiv) {
+      statusDiv.innerText = "⚠️ Please enter a license key.";
+      statusDiv.style.color = "var(--orn)";
+    }
     return;
   }
 
-  statusEl.innerText = "Verifying key...";
-  statusEl.style.color = "var(--ac2)";
+  if (statusDiv) {
+    statusDiv.innerText = "Verifying key...";
+    statusDiv.style.color = "var(--ac2)";
+  }
 
   try {
     const response = await fetch(LICENSE_API_URL, {
@@ -150,8 +178,10 @@ async function overlayVerifyAndUnlock() {
     if (data.success) {
       isSessionVerified = true;
       localStorage.setItem("gym_license_key", key);
-      statusEl.innerText = "✓ Success! Unlocking...";
-      statusEl.style.color = "var(--ac)";
+      if (statusDiv) {
+        statusDiv.innerText = "✓ Success! Unlocking...";
+        statusDiv.style.color = "var(--ac)";
+      }
       
       setTimeout(() => {
         const overlay = document.getElementById("activationOverlay");
@@ -159,12 +189,16 @@ async function overlayVerifyAndUnlock() {
         updateSettingsDisplay();
       }, 800);
     } else {
-      statusEl.innerText = `❌ ${data.message || "Invalid Key"}`;
-      statusEl.style.color = "var(--red)";
+      if (statusDiv) {
+        statusDiv.innerText = `❌ ${data.message || "Invalid Key"}`;
+        statusDiv.style.color = "var(--red)";
+      }
     }
   } catch (err) {
-    statusEl.innerText = "❌ Connection error during validation.";
-    statusEl.style.color = "var(--red)";
+    if (statusDiv) {
+      statusDiv.innerText = "❌ Connection error during validation.";
+      statusDiv.style.color = "var(--red)";
+    }
   }
 }
 
@@ -431,9 +465,9 @@ function toggleCompleteAll() {
   });
 
   if (newState) {
-    button.textContent = "Unselect All";
+    if (button) button.textContent = "Unselect All";
   } else {
-    button.textContent = "Complete All";
+    if (button) button.textContent = "Complete All";
   }
 
   saveState();
@@ -538,40 +572,46 @@ const GOOGLE_CLIENT_ID = "223614031278-omh19sjhmrvqn64tmbrore8lclg3qk2r.apps.goo
 
 function initGoogleAuth() {
   if (typeof google === 'undefined' || !google.accounts) return;
+  
+  // Initialize Google Identity Services for Sign-In Button / One Tap
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: handleCredentialResponse
+  });
+
+  // Render Google Identity button if container exists
+  const btnDiv = document.getElementById("overlayGoogleBtn") || document.getElementById("buttonDiv");
+  if (btnDiv) {
+    google.accounts.id.renderButton(
+      btnDiv,
+      { theme: "outline", size: "large", width: "100%" }
+    );
+  }
+
+  // Fallback token client configuration for drive sync actions
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: GOOGLE_CLIENT_ID,
-    scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/oauth2/v3/userinfo.email',
+    scope: 'https://www.googleapis.com/auth/drive.file',
     callback: async (response) => {
       if (response.error !== undefined) {
         alert("Authentication failed.");
         return;
       }
       gUserAccessToken = response.access_token;
-      await fetchUserInfo();
       await loadDataFromDrive();
     },
   });
 }
 
 function handleGoogleLogin() {
-  if (!tokenClient) initGoogleAuth();
-  if (tokenClient) {
-    tokenClient.requestAccessToken({ prompt: 'consent' });
-  } else {
-    alert("Google Identity script is still loading. Try again in a second.");
-  }
-}
-
-async function fetchUserInfo() {
+  // Triggers Google Sign-In prompt or renders popup via GIS
   try {
-    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: `Bearer ${gUserAccessToken}` }
-    });
-    const data = await res.json();
-    gUserEmail = data.email;
-    updateGoogleAuthUIStates();
-  } catch (err) {
-    console.error("Failed to fetch user info", err);
+    google.accounts.id.prompt();
+  } catch (e) {
+    if (!tokenClient) initGoogleAuth();
+    if (tokenClient) {
+      tokenClient.requestAccessToken({ prompt: 'consent' });
+    }
   }
 }
 
