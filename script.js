@@ -20,6 +20,14 @@ function handleCredentialResponse(response) {
 }
 
 const SAVE_KEY = "gymtracker_save";
+const $ = (id) => document.getElementById(id);
+const AUTH_CHECK_KEY = "gym_auth_check_timestamp";
+const AUTH_CHECK_TTL = 3 * 60 * 60 * 1000;
+const INACTIVITY_LIMIT_MS = 3 * 60 * 60 * 1000;
+
+let authCheckedAt = parseInt(sessionStorage.getItem(AUTH_CHECK_KEY), 10) || 0;
+let lastActivity = Date.now();
+let inactivityInterval = null;
 
 // Google Sheets Web App URL for license key validation 
 const LICENSE_API_URL = "https://script.google.com/macros/s/AKfycbw8FkI4EkCUS5NpN3BBJqNAd-_lZ6cKTPJSDWyzeyYwxlZXAqL6oFK6ckVu9RD8DiUs0Q/exec"; 
@@ -91,23 +99,85 @@ function toggleSettingsMenu() {
 }
 
 /* --- OVERLAY & SESSION VALIDATION LOGIC --- */
+function getSavedLicenseKey() {
+  return localStorage.getItem("gym_license_key") || "";
+}
+
+function saveAuthCheckTimestamp() {
+  authCheckedAt = Date.now();
+  sessionStorage.setItem(AUTH_CHECK_KEY, String(authCheckedAt));
+}
+
+function isAuthCheckExpired() {
+  return Date.now() - authCheckedAt > AUTH_CHECK_TTL;
+}
+
+function showActivationOverlay() {
+  const overlay = $("activationOverlay");
+  if (overlay) overlay.style.display = "flex";
+}
+
+function verifySavedActivationKey(key, statusDiv = null, hideOnSuccess = true) {
+  if (statusDiv) {
+    statusDiv.innerText = "Verifying stored key...";
+    statusDiv.style.color = "var(--ac2)";
+  }
+
+  return fetch(LICENSE_API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ licenseKey: key, email: gUserEmail })
+  })
+  .then(response => response.json())
+  .then(data => {
+    saveAuthCheckTimestamp();
+    if (data.success) {
+      isSessionVerified = true;
+      localStorage.setItem("gym_session_verified", "true");
+      localStorage.setItem("gym_license_key", key);
+      if (hideOnSuccess) {
+        const overlay = $("activationOverlay");
+        if (overlay) overlay.style.display = "none";
+      }
+      updateSettingsDisplay();
+      return true;
+    }
+    isSessionVerified = false;
+    localStorage.setItem("gym_session_verified", "false");
+    if (statusDiv) {
+      statusDiv.innerText = `❌ ${data.message || "Invalid or Expired Key"}`;
+      statusDiv.style.color = "var(--red)";
+    }
+    return false;
+  })
+  .catch(() => {
+    saveAuthCheckTimestamp();
+    if (statusDiv) {
+      statusDiv.innerText = "❌ Connection error during validation.";
+      statusDiv.style.color = "var(--red)";
+    }
+    return false;
+  });
+}
+
 function checkSessionVerification() {
-  const overlay = document.getElementById("activationOverlay");
-  const savedKey = localStorage.getItem("gym_license_key");
-  
-  // If session is already verified via local storage credentials, hide popup automatically
+  const overlay = $("activationOverlay");
+  const savedKey = getSavedLicenseKey();
+
+  if (gUserEmail && savedKey && !isSessionVerified && (authCheckedAt === 0 || isAuthCheckExpired())) {
+    verifySavedActivationKey(savedKey, $("overlayKeyStatus"), false);
+  }
+
   if (isSessionVerified && savedKey && gUserEmail) {
     if (overlay) overlay.style.display = "none";
     updateSettingsDisplay();
   } else {
-    if (overlay) overlay.style.display = "flex";
+    showActivationOverlay();
     if (savedKey) {
-      const overlayInput = document.getElementById("overlayKeyInput");
+      const overlayInput = $("overlayKeyInput");
       if (overlayInput) overlayInput.value = savedKey;
     }
-    if (gUserEmail) {
-      updateGoogleAuthUIStates();
-    }
+    updateGoogleAuthUIStates();
   }
 }
 
@@ -142,8 +212,8 @@ function updateSettingsDisplay() {
 }
 
 async function overlayVerifyAndUnlock() {
-  const keyInputEl = document.getElementById('overlayKeyInput');
-  const statusDiv = document.getElementById('overlayKeyStatus');
+  const keyInputEl = $("overlayKeyInput");
+  const statusDiv = $("overlayKeyStatus");
 
   const key = keyInputEl ? keyInputEl.value.trim() : "";
   
@@ -168,44 +238,17 @@ async function overlayVerifyAndUnlock() {
     statusDiv.style.color = "var(--ac2)";
   }
 
-  try {
-    const response = await fetch(LICENSE_API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ licenseKey: key, email: gUserEmail })
-    });
-    
-    const data = await response.json();
-    if (data.success) {
-      isSessionVerified = true;
-      localStorage.setItem("gym_session_verified", "true");
-      localStorage.setItem("gym_license_key", key);
-      
-      if (statusDiv) {
-        statusDiv.innerText = "✓ Success! Unlocking...";
-        statusDiv.style.color = "var(--ac)";
-      }
-      
-      setTimeout(() => {
-        const overlay = document.getElementById("activationOverlay");
-        if (overlay) overlay.style.display = "none";
-        updateSettingsDisplay();
-      }, 800);
-    } else {
-      // If code expired or is invalid, force popup to stay active and require new credentials
-      isSessionVerified = false;
-      localStorage.setItem("gym_session_verified", "false");
-      
-      if (statusDiv) {
-        statusDiv.innerText = `❌ ${data.message || "Invalid or Expired Key"}`;
-        statusDiv.style.color = "var(--red)";
-      }
-    }
-  } catch (err) {
-    if (statusDiv) {
-      statusDiv.innerText = "❌ Connection error during validation.";
-      statusDiv.style.color = "var(--red)";
-    }
+  const success = await verifySavedActivationKey(key, statusDiv, true);
+  if (success) {
+    statusDiv.innerText = "✓ Success! Unlocking...";
+    statusDiv.style.color = "var(--ac)";
+    localStorage.setItem("gym_license_key", key);
+    localStorage.setItem("gym_session_verified", "true");
+    setTimeout(() => {
+      const overlay = $("activationOverlay");
+      if (overlay) overlay.style.display = "none";
+      updateSettingsDisplay();
+    }, 800);
   }
 }
 
@@ -264,13 +307,10 @@ function loadState() {
   
   applyTheme();
 
-  if (document.getElementById("globalWorkoutDate")) {
-    document.getElementById("globalWorkoutDate").value = S.workoutDate;
-  }
-  
-  if (document.getElementById("streakCount")) {
-    document.getElementById("streakCount").innerText = S.streak.count || 1;
-  }
+  const workoutDateInput = $("globalWorkoutDate");
+  if (workoutDateInput) workoutDateInput.value = S.workoutDate;
+  const streakCountEl = $("streakCount");
+  if (streakCountEl) streakCountEl.innerText = S.streak.count || 1;
 
   renderPageSpecifics();
   checkSessionVerification();
@@ -314,18 +354,32 @@ function updateDashStats() {
 }
 
 function renderDashboardPRs() {
-  const container = document.getElementById("prGridContainer");
+  const container = $("prGridContainer");
   if (!container) return;
-  container.innerHTML = "";
+  container.textContent = "";
+  const fragment = document.createDocumentFragment();
+
   PR_FIELDS.forEach(f => {
     const val = S.fields[`pr_${f}`] || "";
-    container.innerHTML += `
-      <div class="pr-item">
-        <label>${f}</label>
-        <input type="text" data-id="pr_${f}" value="${val}" placeholder="--" oninput="saveState();">
-      </div>
-    `;
+    const item = document.createElement("div");
+    item.className = "pr-item";
+
+    const label = document.createElement("label");
+    label.textContent = f;
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.dataset.id = `pr_${f}`;
+    input.value = val;
+    input.placeholder = "--";
+    input.addEventListener("input", saveState);
+
+    item.appendChild(label);
+    item.appendChild(input);
+    fragment.appendChild(item);
   });
+
+  container.appendChild(fragment);
 }
 
 function buildWaterGlasses() {
@@ -390,13 +444,17 @@ function updateProgress() {
   const exercises = S.plan[S.currentRoutine] || [];
   let done = 0;
   exercises.forEach(ex => {
-    if (document.getElementById(`chk_${ex}`)?.checked || S.fields[`chk_${ex}`]) done++;
+    if ($( `chk_${ex}` )?.checked || S.fields[`chk_${ex}`]) done++;
   });
   const pct = exercises.length > 0 ? Math.round((done / exercises.length) * 100) : 0;
   
-  if (document.getElementById("pctLabel")) document.getElementById("pctLabel").innerText = `${pct}%`;
-  if (document.getElementById("doneCount")) document.getElementById("doneCount").innerText = `${done}/${exercises.length} exercises`;
-  if (document.getElementById("bar")) document.getElementById("bar").style.width = `${pct}%`;
+  const pctLabel = $("pctLabel");
+  const doneCount = $("doneCount");
+  const bar = $("bar");
+
+  if (pctLabel) pctLabel.innerText = `${pct}%`;
+  if (doneCount) doneCount.innerText = `${done}/${exercises.length} exercises`;
+  if (bar) bar.style.width = `${pct}%`;
 }
 
 function promptAddExercise() {
@@ -417,22 +475,34 @@ function openRemoveModal() {
     return;
   }
 
-  const listContainer = document.getElementById("removeModalList");
+  const listContainer = $("removeModalList");
   if (!listContainer) return;
 
-  let html = "";
-  exercises.forEach(ex => {
-    html += `
-      <label style="display: flex; align-items: center; gap: 10px; background: var(--bg2, #101c30); padding: 10px; border-radius: 8px; cursor: pointer; color: var(--tx, #fff); font-size: 0.9rem;">
-        <input type="checkbox" class="remove-exercise-chk" value="${ex}" style="width: 18px; height: 18px; accent-color: var(--ac, #00ffcc);">
-        <span>${ex}</span>
-      </label>
-    `;
-  });
-  listContainer.innerHTML = html;
+  listContainer.textContent = "";
+  const fragment = document.createDocumentFragment();
 
-  document.getElementById("removeModalOverlay")?.classList.add("show");
-  document.getElementById("removeModalDrawer")?.classList.add("open");
+  exercises.forEach(ex => {
+    const label = document.createElement("label");
+    label.style.cssText = "display: flex; align-items: center; gap: 10px; background: var(--bg2, #101c30); padding: 10px; border-radius: 8px; cursor: pointer; color: var(--tx, #fff); font-size: 0.9rem;";
+
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.className = "remove-exercise-chk";
+    input.value = ex;
+    input.style.cssText = "width: 18px; height: 18px; accent-color: var(--ac, #00ffcc);";
+
+    const span = document.createElement("span");
+    span.textContent = ex;
+
+    label.appendChild(input);
+    label.appendChild(span);
+    fragment.appendChild(label);
+  });
+
+  listContainer.appendChild(fragment);
+
+  $("removeModalOverlay")?.classList.add("show");
+  $("removeModalDrawer")?.classList.add("open");
 }
 
 function closeRemoveModal() {
@@ -495,16 +565,21 @@ function changeMonth(delta) {
 }
 
 function renderCalendar() {
-  const gridEl = document.getElementById("calendarGrid");
-  const monthTitle = document.getElementById("calMonthTitle");
+  const gridEl = $("calendarGrid");
+  const monthTitle = $("calMonthTitle");
   if (!gridEl) return;
 
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   if (monthTitle) monthTitle.innerText = `${monthNames[S.calMonth]} ${S.calYear}`;
 
-  gridEl.innerHTML = "";
+  const fragment = document.createDocumentFragment();
   const days = ["M", "T", "W", "T", "F", "S", "S"];
-  days.forEach(d => { gridEl.innerHTML += `<div class="calendar-day-lbl">${d}</div>`; });
+  days.forEach(d => {
+    const label = document.createElement("div");
+    label.className = "calendar-day-lbl";
+    label.innerText = d;
+    fragment.appendChild(label);
+  });
 
   const daysInMo = new Date(S.calYear, S.calMonth + 1, 0).getDate();
   for (let d = 1; d <= daysInMo; d++) {
@@ -512,30 +587,30 @@ function renderCalendar() {
     const cell = document.createElement("div");
     cell.className = "calendar-cell" + (dateStr === S.historySelectedDate ? " active-day" : "");
     cell.innerText = d;
-    
+
     if (S.workoutLog[dateStr] && S.workoutLog[dateStr].length > 0) {
       const dot = document.createElement("div");
       dot.className = "dot-indicator";
       cell.appendChild(dot);
     }
 
-    cell.onclick = () => {
+    cell.addEventListener("click", () => {
       S.historySelectedDate = dateStr;
-      
       const parts = dateStr.split("-");
       if (parts.length === 3) {
         S.calYear = parseInt(parts[0], 10);
         S.calMonth = parseInt(parts[1], 10) - 1;
       }
-
       saveState();
       renderCalendar();
       inspectDayLog(dateStr);
-    };
+    });
 
-    gridEl.appendChild(cell);
+    fragment.appendChild(cell);
   }
 
+  gridEl.textContent = "";
+  gridEl.appendChild(fragment);
   inspectDayLog(S.historySelectedDate);
 }
 
@@ -799,10 +874,46 @@ function resetTimer() {
   if (startBtn) startBtn.innerText = "Start";
 }
 
-window.onload = () => {
+function redirectToIndexIfNeeded() {
+  const currentPath = window.location.pathname.split('/').pop().toLowerCase() || 'index.html';
+  if (currentPath === 'index.html' || currentPath === '') return;
+
+  const sameOriginReferrer = document.referrer && document.referrer.startsWith(window.location.origin);
+  const navEntries = performance.getEntriesByType ? performance.getEntriesByType('navigation') : [];
+  const navType = navEntries.length ? navEntries[0].type : (performance.navigation && performance.navigation.type === 1 ? 'reload' : 'navigate');
+
+  if (!sameOriginReferrer || navType === 'reload' || navType === 'back_forward') {
+    window.location.replace('index.html');
+  }
+}
+
+function resetInactivityTimer() {
+  lastActivity = Date.now();
+}
+
+function startInactivityWatcher() {
+  const activityEvents = ['click', 'keydown', 'touchstart', 'mousemove', 'scroll'];
+  activityEvents.forEach(eventName => window.addEventListener(eventName, resetInactivityTimer, { passive: true }));
+
+  inactivityInterval = setInterval(() => {
+    if (Date.now() - lastActivity >= INACTIVITY_LIMIT_MS) {
+      location.reload();
+    }
+  }, 60 * 1000);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      resetInactivityTimer();
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  redirectToIndexIfNeeded();
   loadState();
-  setTimeout(initGoogleAuth, 500);
-};
+  initGoogleAuth();
+  startInactivityWatcher();
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
