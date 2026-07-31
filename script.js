@@ -75,16 +75,18 @@ let S = {
 };
 
 /* --- TOAST & THEME --- */
-function showSaveToast() {
+function showToast(message = 'Saved!', type = 'success') {
   const t = document.getElementById("saveToast");
   if (!t) return;
-  t.classList.add("show");
-  setTimeout(() => t.classList.remove("show"), 1200);
+  t.innerText = message;
+  t.classList.remove('success', 'error');
+  t.classList.add('show', type === 'error' ? 'error' : 'success');
+  setTimeout(() => t.classList.remove('show', 'success', 'error'), 1200);
 }
 
 function manualSave() {
   saveState();
-  showSaveToast();
+  showToast('Data saved locally.');
 }
 
 function toggleTheme() {
@@ -310,7 +312,7 @@ function saveState() {
   });
 
   localStorage.setItem(SAVE_KEY, JSON.stringify(S));
-  showSaveToast();
+  showToast('Saved locally.', 'success');
 
   if (gUserAccessToken) {
     clearTimeout(driveSyncTimeout);
@@ -696,7 +698,11 @@ function initGoogleAuth() {
     scope: 'https://www.googleapis.com/auth/drive.file',
     callback: async (response) => {
       if (response.error !== undefined) {
-        alert("Google Drive authentication failed.");
+        if ((response.error === 'consent_required' || response.error === 'interaction_required') && (pendingDriveSave || pendingDriveLoad)) {
+          tokenClient.requestAccessToken({ prompt: 'consent' });
+          return;
+        }
+        showToast("Google Drive authentication failed.", 'error');
         pendingDriveSave = false;
         pendingDriveLoad = false;
         return;
@@ -793,7 +799,7 @@ async function saveDataToDrive() {
       body: form
     });
   }
-  showSaveToast();
+  showToast('Saved to Google Drive.', 'success');
 }
 
 async function saveDataToDriveSilent() {
@@ -907,23 +913,33 @@ async function loadDataFromDrive() {
         return;
       }
     }
-    alert("Please connect to Google first.");
+    showToast('Please connect Google from Settings first.', 'error');
     return;
   }
 
   const fileId = await findExistingFileId('gymtracker_save.json');
-  if (!fileId) return;
+  if (!fileId) {
+    showToast('No gymtracker_save.json found in Drive.', 'error');
+    return;
+  }
 
   const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
     headers: { Authorization: `Bearer ${gUserAccessToken}` }
   });
   
   if (response.ok) {
-    const cloudData = await response.json();
-    mergeCloudData(cloudData);
-    saveState();
-    renderPageSpecifics();
-    showSaveToast();
+    try {
+      const cloudData = await response.json();
+      mergeCloudData(cloudData);
+      saveState();
+      renderPageSpecifics();
+      showToast('Loaded data from Google Drive.');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to parse Drive data.', 'error');
+    }
+  } else {
+    showToast('Failed to load data from Drive.', 'error');
   }
 }
 

@@ -456,8 +456,10 @@ input[type="number"], input[type="text"] {
   font-size: 0.8rem;
   font-weight: 800;
   color: var(--ac);
-  transition: transform 0.3s ease;
+  transition: transform 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
+.save-toast.success { background: rgba(0, 230, 118, 0.12); border-color: #00e676; color: #00e676; }
+.save-toast.error { background: rgba(255, 82, 82, 0.12); border-color: #ff5252; color: #ff5252; }
 .save-toast.show { transform: translateX(-50%) translateY(0); }
 
 .timer-btn {
