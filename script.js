@@ -909,7 +909,7 @@ async function loadDataFromDrive() {
       if (!tokenClient) initGoogleAuth();
       if (tokenClient) {
         pendingDriveLoad = true;
-        tokenClient.requestAccessToken({ prompt: 'consent' });
+        tokenClient.requestAccessToken();
         return;
       }
     }
@@ -1074,7 +1074,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   startInactivityWatcher();
 });
 
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
       .catch(err => console.log('Service Worker Registration Failed:', err));

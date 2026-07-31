@@ -403,6 +403,39 @@ input[type="number"], input[type="text"] {
   border-color: var(--ac2);
 }
 
+.overlay-row {
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.overlay-input {
+  width: 100%;
+  padding: 10px;
+  background: var(--inp);
+  border: 1px solid var(--bdr);
+  border-radius: 8px;
+  color: var(--tx);
+  text-align: center;
+}
+
+.overlay-button-group .menu-action-btn {
+  width: 70%;
+  max-width: 280px;
+  margin: 0 auto;
+}
+
+.overlay-button-group .menu-action-btn.primary {
+  background: var(--ac);
+  color: #000;
+}
+
+.overlay-button-group .menu-action-btn.secondary {
+  background: var(--ac2);
+  color: #000;
+}
+
 /* Bottom Nav */
 .bottom-nav {
   position: fixed;
