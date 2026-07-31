@@ -828,7 +828,89 @@ async function saveDataToDriveSilent() {
   }
 }
 
+function mergeCloudData(cloudData) {
+  if (!cloudData || typeof cloudData !== 'object') return;
+
+  if (cloudData.plan && typeof cloudData.plan === 'object') {
+    Object.keys(cloudData.plan).forEach(routine => {
+      if (!S.plan[routine]) {
+        S.plan[routine] = Array.isArray(cloudData.plan[routine]) ? [...cloudData.plan[routine]] : [];
+      } else if (Array.isArray(cloudData.plan[routine])) {
+        cloudData.plan[routine].forEach(ex => {
+          if (ex && !S.plan[routine].includes(ex)) {
+            S.plan[routine].push(ex);
+          }
+        });
+      }
+    });
+  }
+
+  if (cloudData.fields && typeof cloudData.fields === 'object') {
+    Object.keys(cloudData.fields).forEach(key => {
+      if (S.fields[key] === undefined || S.fields[key] === "") {
+        S.fields[key] = cloudData.fields[key];
+      }
+    });
+  }
+
+  if (cloudData.workoutLog && typeof cloudData.workoutLog === 'object') {
+    Object.keys(cloudData.workoutLog).forEach(dateKey => {
+      const cloudEntries = Array.isArray(cloudData.workoutLog[dateKey]) ? cloudData.workoutLog[dateKey] : [];
+      if (!Array.isArray(S.workoutLog[dateKey])) {
+        S.workoutLog[dateKey] = [...cloudEntries];
+        return;
+      }
+
+      cloudEntries.forEach(cloudEntry => {
+        if (!cloudEntry || !cloudEntry.exercise) return;
+        const exists = S.workoutLog[dateKey].some(localEntry => localEntry.exercise === cloudEntry.exercise);
+        if (!exists) {
+          S.workoutLog[dateKey].push(cloudEntry);
+        }
+      });
+    });
+  }
+
+  if (cloudData.water !== undefined && (S.water === undefined || S.water === 0)) {
+    S.water = cloudData.water;
+  }
+  if (cloudData.streak && typeof cloudData.streak === 'object' && !S.streak.count) {
+    S.streak = cloudData.streak;
+  }
+  if (cloudData.currentRoutine && !S.currentRoutine) {
+    S.currentRoutine = cloudData.currentRoutine;
+  }
+  if (cloudData.workoutDate && !S.workoutDate) {
+    S.workoutDate = cloudData.workoutDate;
+  }
+  if (cloudData.historySelectedDate && !S.historySelectedDate) {
+    S.historySelectedDate = cloudData.historySelectedDate;
+  }
+  if (cloudData.calMonth !== undefined && S.calMonth === undefined) {
+    S.calMonth = cloudData.calMonth;
+  }
+  if (cloudData.calYear !== undefined && S.calYear === undefined) {
+    S.calYear = cloudData.calYear;
+  }
+  if (cloudData.theme && !S.theme) {
+    S.theme = cloudData.theme;
+  }
+}
+
 async function loadDataFromDrive() {
+  if (!gUserAccessToken) {
+    if (gUserEmail) {
+      if (!tokenClient) initGoogleAuth();
+      if (tokenClient) {
+        pendingDriveLoad = true;
+        tokenClient.requestAccessToken({ prompt: 'consent' });
+        return;
+      }
+    }
+    alert("Please connect to Google first.");
+    return;
+  }
+
   const fileId = await findExistingFileId('gymtracker_save.json');
   if (!fileId) return;
 
@@ -838,7 +920,7 @@ async function loadDataFromDrive() {
   
   if (response.ok) {
     const cloudData = await response.json();
-    S = Object.assign(S, cloudData);
+    mergeCloudData(cloudData);
     saveState();
     renderPageSpecifics();
     showSaveToast();

@@ -26,7 +26,8 @@
     
     <div style="margin-bottom: 12px;">
       <input type="text" id="overlayKeyInput" placeholder="Enter License Key" style="width: 100%; padding: 10px; background: var(--inp); border: 1px solid var(--bdr); border-radius: 8px; color: var(--txt); text-align: center; margin-bottom: 8px;">
-      <button class="menu-action-btn" onclick="overlayVerifyAndUnlock()" style="width: 70%; max-width: 280px; display: block; margin: 0 auto; padding: 12px; background: var(--ac); color: #000; font-weight: bold; text-align: center;">Validate Key & Unlock</button>
+      <button class="menu-action-btn" onclick="overlayVerifyAndUnlock()" style="width: 70%; max-width: 280px; display: block; margin: 0 auto 8px; padding: 12px; background: var(--ac); color: #000; font-weight: bold; text-align: center;">Validate Key & Unlock</button>
+      <button class="menu-action-btn" onclick="loadDataFromDrive()" style="width: 70%; max-width: 280px; display: block; margin: 0 auto; padding: 12px; background: var(--ac2); color: #000; font-weight: bold; text-align: center;">☁️ Get Data From Drive</button>
     </div>
     
     <div id="overlayKeyStatus" style="font-size: 0.8rem; margin-top: 8px; color: var(--orn);"></div>
@@ -62,7 +63,7 @@
           </div>
         </div>
         <div class="setting-item">
-          <button class="menu-action-btn" onclick="saveDataToDrive()" style="margin-top:6px;">☁️ Backup to Drive</button>
+          <button class="menu-action-btn" onclick="loadDataFromDrive()" style="margin-top:6px;">☁️ Get Data From Drive</button>
         </div>
       </div>
     </div>
