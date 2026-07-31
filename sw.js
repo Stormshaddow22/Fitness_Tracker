@@ -13,6 +13,11 @@ const ASSETS_TO_CACHE = [
 
 // Install Event - Cache All App Assets
 self.addEventListener('install', (event) => {
+  if (self.location.protocol === 'file:') {
+    console.warn('Service worker install skipped on file:// protocol.');
+    return;
+  }
+
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS_TO_CACHE);

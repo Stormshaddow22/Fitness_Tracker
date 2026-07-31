@@ -42,6 +42,7 @@ let tokenClient;
 let gUserAccessToken = null;
 let pendingDriveSave = false;
 let pendingDriveLoad = false;
+let googleAuthInitialized = false;
 let isSessionVerified = localStorage.getItem("gym_session_verified") === "true";
 let gUserEmail = localStorage.getItem("userEmail") || null;
 
@@ -671,28 +672,24 @@ function inspectDayLog(dateStr) {
 }
 
 /* --- GOOGLE AUTH & DRIVE SYNC --- */
-let tokenClient;
-let gUserAccessToken = null;
 
 const GOOGLE_CLIENT_ID = "223614031278-omh19sjhmrvqn64tmbrore8lclg3qk2r.apps.googleusercontent.com";
 
 function initGoogleAuth() {
-  if (typeof google === 'undefined' || !google.accounts) return;
-  
+  if (window.location.protocol === 'file:') {
+    console.warn('Google login is not supported over file://. Use a local server or install the PWA.');
+  }
+
+  if (typeof google === 'undefined' || !google.accounts) {
+    return;
+  }
+
   google.accounts.id.initialize({
     client_id: GOOGLE_CLIENT_ID,
     callback: handleCredentialResponse,
     auto_select: false,
     cancel_on_tap_outside: true
   });
-
-  const btnDiv = document.getElementById("overlayGoogleBtn") || document.getElementById("buttonDiv");
-  if (btnDiv) {
-    google.accounts.id.renderButton(
-      btnDiv,
-      { theme: "outline", size: "large", width: "100%" }
-    );
-  }
 
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: GOOGLE_CLIENT_ID,
@@ -715,6 +712,8 @@ function initGoogleAuth() {
       }
     },
   });
+
+  googleAuthInitialized = true;
 }
 
 function handleGoogleLogin() {
@@ -723,7 +722,9 @@ function handleGoogleLogin() {
     return;
   }
 
-  if (!tokenClient) initGoogleAuth();
+  if (!googleAuthInitialized) {
+    initGoogleAuth();
+  }
 
   if (gUserEmail && tokenClient) {
     tokenClient.requestAccessToken({ prompt: 'consent' });
@@ -966,10 +967,12 @@ function startInactivityWatcher() {
   });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   redirectToIndexIfNeeded();
   loadState();
+  updateSettingsDisplay();
   initGoogleAuth();
+  await checkSessionVerification();
   startInactivityWatcher();
 });
 
