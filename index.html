@@ -5,12 +5,14 @@
 <!-- PWA Manifest & Mobile Meta Tags -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#060d1b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
 <link rel="apple-touch-icon" href="icon-192.png">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
     <title>Gym Tracker - My Routine</title>
-    <link rel="stylesheet" href="https://stormshaddow22.github.io/Fitness_Tracker/styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <!-- Full-Screen Activation & Google Login Overlay -->
@@ -20,13 +22,13 @@
     <p style="color: var(--txt-sub); font-size: 0.9rem; margin-bottom: 20px;">Please connect your Google account and validate your activation key to continue.</p>
     
     <!-- Step 1: Google Login -->
-    <button class="menu-action-btn" id="overlayGoogleBtn" onclick="handleGoogleLogin()" style="width: 100%; padding: 12px; margin-bottom: 12px; font-weight: bold;">🌐 Connect Google Account</button>
+    <button class="menu-action-btn" id="overlayGoogleBtn" onclick="handleGoogleLogin()" style="width: 100%; padding: 12px; margin-bottom: 12px; font-weight: bold; justify-content: center;">🌐 Connect Google Account</button>
     <div id="overlayEmailDisplay" style="display: none; font-size: 0.8rem; color: var(--ac2); margin-bottom: 16px; word-break: break-all;"></div>
     
     <!-- Step 2: Key Validation -->
     <div style="margin-bottom: 12px;">
       <input type="text" id="overlayKeyInput" placeholder="Enter License Key" style="width: 100%; padding: 10px; background: var(--inp); border: 1px solid var(--bdr); border-radius: 8px; color: var(--txt); text-align: center; margin-bottom: 8px;">
-      <button class="menu-action-btn" onclick="overlayVerifyAndUnlock()" style="width: 100%; padding: 12px; background: var(--ac); color: #000; font-weight: bold;">Validate Key & Unlock</button>
+      <button class="menu-action-btn" onclick="overlayVerifyAndUnlock()" style="width: 70%; max-width: 280px; display: block; margin: 0 auto; padding: 12px; background: var(--ac); color: #000; font-weight: bold; text-align: center;">Validate Key & Unlock</button>
     </div>
     
     <div id="overlayKeyStatus" style="font-size: 0.8rem; margin-top: 8px; color: var(--orn);"></div>
@@ -137,21 +139,21 @@
     </div>
 
     <nav class="bottom-nav">
-      <a href="https://stormshaddow22.github.io/Fitness_Tracker/index.html" class="nav-link active">
+      <a href="index.html" class="nav-link active">
         <span class="nav-icon">🍎</span>
         <span>My Routine</span>
       </a>
-      <a href="https://stormshaddow22.github.io/Fitness_Tracker/workout.html" class="nav-link">
+      <a href="workout.html" class="nav-link">
         <span class="nav-icon">🏋️</span>
         <span>Workout</span>
       </a>
-      <a href="https://stormshaddow22.github.io/Fitness_Tracker/history.html" class="nav-link">
+      <a href="history.html" class="nav-link">
         <span class="nav-icon">📅</span>
         <span>History</span>
       </a>
     </nav>
 
     <script>window.CURRENT_PAGE = 'Dashboard';</script>
-    <script src="https://stormshaddow22.github.io/Fitness_Tracker/script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>

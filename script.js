@@ -14,12 +14,36 @@ function handleCredentialResponse(response) {
     gUserEmail = responsePayload.email;
     console.log("Logged in user email:", gUserEmail);
     
-    // Save email securely
     localStorage.setItem('userEmail', gUserEmail);
     updateGoogleAuthUIStates();
+    saveAuthCheckTimestamp();
+
+    if (tokenClient && !gUserAccessToken) {
+      tokenClient.requestAccessToken({ prompt: 'consent' });
+    }
+
+    if (gUserEmail) {
+      checkSessionVerification();
+    }
 }
 
 const SAVE_KEY = "gymtracker_save";
+const $ = (id) => document.getElementById(id);
+
+const AUTH_CHECK_KEY = "gym_auth_check_timestamp";
+const AUTH_CHECK_TTL = 3 * 60 * 60 * 1000;
+const INACTIVITY_LIMIT_MS = 3 * 60 * 60 * 1000;
+
+let authCheckedAt = parseInt(sessionStorage.getItem(AUTH_CHECK_KEY), 10) || 0;
+let lastActivity = Date.now();
+let inactivityInterval = null;
+
+let tokenClient;
+let gUserAccessToken = null;
+let pendingDriveSave = false;
+let pendingDriveLoad = false;
+let isSessionVerified = localStorage.getItem("gym_session_verified") === "true";
+let gUserEmail = localStorage.getItem("userEmail") || null;
 
 // Google Sheets Web App URL for license key validation 
 const LICENSE_API_URL = "https://script.google.com/macros/s/AKfycbw8FkI4EkCUS5NpN3BBJqNAd-_lZ6cKTPJSDWyzeyYwxlZXAqL6oFK6ckVu9RD8DiUs0Q/exec"; 
@@ -48,10 +72,6 @@ let S = {
   historySelectedDate: new Date().toISOString().split("T")[0],
   theme: "dark"
 };
-
-// Check persistent session storage across page transitions
-let isSessionVerified = localStorage.getItem("gym_session_verified") === "true";
-let gUserEmail = localStorage.getItem("userEmail") || null;
 
 /* --- TOAST & THEME --- */
 function showSaveToast() {
@@ -91,24 +111,95 @@ function toggleSettingsMenu() {
 }
 
 /* --- OVERLAY & SESSION VALIDATION LOGIC --- */
-function checkSessionVerification() {
-  const overlay = document.getElementById("activationOverlay");
-  const savedKey = localStorage.getItem("gym_license_key");
-  
-  // If session is already verified via local storage credentials, hide popup automatically
-  if (isSessionVerified && savedKey && gUserEmail) {
-    if (overlay) overlay.style.display = "none";
-    updateSettingsDisplay();
-  } else {
-    if (overlay) overlay.style.display = "flex";
-    if (savedKey) {
-      const overlayInput = document.getElementById("overlayKeyInput");
-      if (overlayInput) overlayInput.value = savedKey;
+function getSavedLicenseKey() {
+  return localStorage.getItem("gym_license_key") || "";
+}
+
+function saveAuthCheckTimestamp() {
+  authCheckedAt = Date.now();
+  sessionStorage.setItem(AUTH_CHECK_KEY, String(authCheckedAt));
+}
+
+function isAuthCheckExpired() {
+  return Date.now() - authCheckedAt > AUTH_CHECK_TTL;
+}
+
+function showActivationOverlay() {
+  const overlay = $("activationOverlay");
+  if (overlay) overlay.style.display = "flex";
+}
+
+function verifySavedActivationKey(key, statusDiv = null, hideOnSuccess = true) {
+  if (statusDiv) {
+    statusDiv.innerText = "Verifying stored key...";
+    statusDiv.style.color = "var(--ac2)";
+  }
+
+  return fetch(LICENSE_API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ licenseKey: key, email: gUserEmail })
+  })
+  .then(response => response.json())
+  .then(data => {
+    saveAuthCheckTimestamp();
+    if (data.success) {
+      isSessionVerified = true;
+      localStorage.setItem("gym_session_verified", "true");
+      localStorage.setItem("gym_license_key", key);
+      if (hideOnSuccess) {
+        const overlay = $("activationOverlay");
+        if (overlay) overlay.style.display = "none";
+      }
+      updateSettingsDisplay();
+      return true;
     }
-    if (gUserEmail) {
-      updateGoogleAuthUIStates();
+    isSessionVerified = false;
+    localStorage.setItem("gym_session_verified", "false");
+    if (statusDiv) {
+      statusDiv.innerText = `❌ ${data.message || "Invalid or Expired Key"}`;
+      statusDiv.style.color = "var(--red)";
+    }
+    return false;
+  })
+  .catch(() => {
+    saveAuthCheckTimestamp();
+    if (statusDiv) {
+      statusDiv.innerText = "❌ Connection error during validation.";
+      statusDiv.style.color = "var(--red)";
+    }
+    return false;
+  });
+}
+
+async function checkSessionVerification() {
+  const savedKey = getSavedLicenseKey();
+  const overlay = $("activationOverlay");
+  const statusDiv = $("overlayKeyStatus");
+
+  if (gUserEmail && savedKey && (!isSessionVerified || authCheckedAt === 0 || isAuthCheckExpired())) {
+    const verified = await verifySavedActivationKey(savedKey, statusDiv, false);
+    if (!verified) {
+      isSessionVerified = false;
+      localStorage.setItem("gym_session_verified", "false");
     }
   }
+
+  if (isSessionVerified && gUserEmail && savedKey) {
+    if (overlay) overlay.style.display = "none";
+  } else {
+    showActivationOverlay();
+    if (savedKey) {
+      const overlayInput = $("overlayKeyInput");
+      if (overlayInput) overlayInput.value = savedKey;
+    }
+    if (!gUserEmail && statusDiv) {
+      statusDiv.innerText = "❌ Please connect your Google account first.";
+      statusDiv.style.color = "var(--red)";
+    }
+  }
+
+  updateGoogleAuthUIStates();
 }
 
 function updateGoogleAuthUIStates() {
@@ -133,7 +224,11 @@ function updateSettingsDisplay() {
     statusEl.innerText = gUserEmail ? `Connected as: ${gUserEmail}` : "Google Account not connected";
   }
   if (googleBtn) {
-    googleBtn.innerText = gUserEmail ? "🔄 Reconnect Google Account" : "🌐 Connect Google Account";
+    if (gUserEmail) {
+      googleBtn.innerText = gUserAccessToken ? "✅ Google Connected" : "🔄 Reconnect Google Account";
+    } else {
+      googleBtn.innerText = "🌐 Connect Google Account";
+    }
   }
   if (keyDisplay) {
     const savedKey = localStorage.getItem("gym_license_key");
@@ -142,8 +237,8 @@ function updateSettingsDisplay() {
 }
 
 async function overlayVerifyAndUnlock() {
-  const keyInputEl = document.getElementById('overlayKeyInput');
-  const statusDiv = document.getElementById('overlayKeyStatus');
+  const keyInputEl = $("overlayKeyInput");
+  const statusDiv = $("overlayKeyStatus");
 
   const key = keyInputEl ? keyInputEl.value.trim() : "";
   
@@ -168,44 +263,16 @@ async function overlayVerifyAndUnlock() {
     statusDiv.style.color = "var(--ac2)";
   }
 
-  try {
-    const response = await fetch(LICENSE_API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ licenseKey: key, email: gUserEmail })
-    });
-    
-    const data = await response.json();
-    if (data.success) {
-      isSessionVerified = true;
-      localStorage.setItem("gym_session_verified", "true");
-      localStorage.setItem("gym_license_key", key);
-      
-      if (statusDiv) {
-        statusDiv.innerText = "✓ Success! Unlocking...";
-        statusDiv.style.color = "var(--ac)";
-      }
-      
-      setTimeout(() => {
-        const overlay = document.getElementById("activationOverlay");
-        if (overlay) overlay.style.display = "none";
-        updateSettingsDisplay();
-      }, 800);
-    } else {
-      // If code expired or is invalid, force popup to stay active and require new credentials
-      isSessionVerified = false;
-      localStorage.setItem("gym_session_verified", "false");
-      
-      if (statusDiv) {
-        statusDiv.innerText = `❌ ${data.message || "Invalid or Expired Key"}`;
-        statusDiv.style.color = "var(--red)";
-      }
-    }
-  } catch (err) {
-    if (statusDiv) {
-      statusDiv.innerText = "❌ Connection error during validation.";
-      statusDiv.style.color = "var(--red)";
-    }
+  const success = await verifySavedActivationKey(key, statusDiv, true);
+  if (success) {
+    statusDiv.innerText = "✓ Success! Unlocking...";
+    statusDiv.style.color = "var(--ac)";
+    localStorage.setItem("gym_license_key", key);
+    setTimeout(() => {
+      const overlay = $("activationOverlay");
+      if (overlay) overlay.style.display = "none";
+      updateSettingsDisplay();
+    }, 800);
   }
 }
 
@@ -264,15 +331,13 @@ function loadState() {
   
   applyTheme();
 
-  if (document.getElementById("globalWorkoutDate")) {
-    document.getElementById("globalWorkoutDate").value = S.workoutDate;
-  }
-  
-  if (document.getElementById("streakCount")) {
-    document.getElementById("streakCount").innerText = S.streak.count || 1;
-  }
+  const workoutDateInput = $("globalWorkoutDate");
+  if (workoutDateInput) workoutDateInput.value = S.workoutDate;
+  const streakCountEl = $("streakCount");
+  if (streakCountEl) streakCountEl.innerText = S.streak.count || 1;
 
   renderPageSpecifics();
+  updateGoogleAuthUIStates();
   checkSessionVerification();
 }
 
@@ -314,18 +379,32 @@ function updateDashStats() {
 }
 
 function renderDashboardPRs() {
-  const container = document.getElementById("prGridContainer");
+  const container = $("prGridContainer");
   if (!container) return;
-  container.innerHTML = "";
+  container.textContent = "";
+  const fragment = document.createDocumentFragment();
+
   PR_FIELDS.forEach(f => {
     const val = S.fields[`pr_${f}`] || "";
-    container.innerHTML += `
-      <div class="pr-item">
-        <label>${f}</label>
-        <input type="text" data-id="pr_${f}" value="${val}" placeholder="--" oninput="saveState();">
-      </div>
-    `;
+    const item = document.createElement("div");
+    item.className = "pr-item";
+
+    const label = document.createElement("label");
+    label.textContent = f;
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.dataset.id = `pr_${f}`;
+    input.value = val;
+    input.placeholder = "--";
+    input.addEventListener("input", saveState);
+
+    item.appendChild(label);
+    item.appendChild(input);
+    fragment.appendChild(item);
   });
+
+  container.appendChild(fragment);
 }
 
 function buildWaterGlasses() {
@@ -390,13 +469,17 @@ function updateProgress() {
   const exercises = S.plan[S.currentRoutine] || [];
   let done = 0;
   exercises.forEach(ex => {
-    if (document.getElementById(`chk_${ex}`)?.checked || S.fields[`chk_${ex}`]) done++;
+    if ($( `chk_${ex}` )?.checked || S.fields[`chk_${ex}`]) done++;
   });
   const pct = exercises.length > 0 ? Math.round((done / exercises.length) * 100) : 0;
   
-  if (document.getElementById("pctLabel")) document.getElementById("pctLabel").innerText = `${pct}%`;
-  if (document.getElementById("doneCount")) document.getElementById("doneCount").innerText = `${done}/${exercises.length} exercises`;
-  if (document.getElementById("bar")) document.getElementById("bar").style.width = `${pct}%`;
+  const pctLabel = $("pctLabel");
+  const doneCount = $("doneCount");
+  const bar = $("bar");
+
+  if (pctLabel) pctLabel.innerText = `${pct}%`;
+  if (doneCount) doneCount.innerText = `${done}/${exercises.length} exercises`;
+  if (bar) bar.style.width = `${pct}%`;
 }
 
 function promptAddExercise() {
@@ -417,22 +500,34 @@ function openRemoveModal() {
     return;
   }
 
-  const listContainer = document.getElementById("removeModalList");
+  const listContainer = $("removeModalList");
   if (!listContainer) return;
 
-  let html = "";
-  exercises.forEach(ex => {
-    html += `
-      <label style="display: flex; align-items: center; gap: 10px; background: var(--bg2, #101c30); padding: 10px; border-radius: 8px; cursor: pointer; color: var(--tx, #fff); font-size: 0.9rem;">
-        <input type="checkbox" class="remove-exercise-chk" value="${ex}" style="width: 18px; height: 18px; accent-color: var(--ac, #00ffcc);">
-        <span>${ex}</span>
-      </label>
-    `;
-  });
-  listContainer.innerHTML = html;
+  listContainer.textContent = "";
+  const fragment = document.createDocumentFragment();
 
-  document.getElementById("removeModalOverlay")?.classList.add("show");
-  document.getElementById("removeModalDrawer")?.classList.add("open");
+  exercises.forEach(ex => {
+    const label = document.createElement("label");
+    label.style.cssText = "display: flex; align-items: center; gap: 10px; background: var(--bg2, #101c30); padding: 10px; border-radius: 8px; cursor: pointer; color: var(--tx, #fff); font-size: 0.9rem;";
+
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.className = "remove-exercise-chk";
+    input.value = ex;
+    input.style.cssText = "width: 18px; height: 18px; accent-color: var(--ac, #00ffcc);";
+
+    const span = document.createElement("span");
+    span.textContent = ex;
+
+    label.appendChild(input);
+    label.appendChild(span);
+    fragment.appendChild(label);
+  });
+
+  listContainer.appendChild(fragment);
+
+  $("removeModalOverlay")?.classList.add("show");
+  $("removeModalDrawer")?.classList.add("open");
 }
 
 function closeRemoveModal() {
@@ -495,16 +590,21 @@ function changeMonth(delta) {
 }
 
 function renderCalendar() {
-  const gridEl = document.getElementById("calendarGrid");
-  const monthTitle = document.getElementById("calMonthTitle");
+  const gridEl = $("calendarGrid");
+  const monthTitle = $("calMonthTitle");
   if (!gridEl) return;
 
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   if (monthTitle) monthTitle.innerText = `${monthNames[S.calMonth]} ${S.calYear}`;
 
-  gridEl.innerHTML = "";
+  const fragment = document.createDocumentFragment();
   const days = ["M", "T", "W", "T", "F", "S", "S"];
-  days.forEach(d => { gridEl.innerHTML += `<div class="calendar-day-lbl">${d}</div>`; });
+  days.forEach(d => {
+    const label = document.createElement("div");
+    label.className = "calendar-day-lbl";
+    label.innerText = d;
+    fragment.appendChild(label);
+  });
 
   const daysInMo = new Date(S.calYear, S.calMonth + 1, 0).getDate();
   for (let d = 1; d <= daysInMo; d++) {
@@ -512,30 +612,30 @@ function renderCalendar() {
     const cell = document.createElement("div");
     cell.className = "calendar-cell" + (dateStr === S.historySelectedDate ? " active-day" : "");
     cell.innerText = d;
-    
+
     if (S.workoutLog[dateStr] && S.workoutLog[dateStr].length > 0) {
       const dot = document.createElement("div");
       dot.className = "dot-indicator";
       cell.appendChild(dot);
     }
 
-    cell.onclick = () => {
+    cell.addEventListener("click", () => {
       S.historySelectedDate = dateStr;
-      
       const parts = dateStr.split("-");
       if (parts.length === 3) {
         S.calYear = parseInt(parts[0], 10);
         S.calMonth = parseInt(parts[1], 10) - 1;
       }
-
       saveState();
       renderCalendar();
       inspectDayLog(dateStr);
-    };
+    });
 
-    gridEl.appendChild(cell);
+    fragment.appendChild(cell);
   }
 
+  gridEl.textContent = "";
+  gridEl.appendChild(fragment);
   inspectDayLog(S.historySelectedDate);
 }
 
@@ -581,7 +681,9 @@ function initGoogleAuth() {
   
   google.accounts.id.initialize({
     client_id: GOOGLE_CLIENT_ID,
-    callback: handleCredentialResponse
+    callback: handleCredentialResponse,
+    auto_select: false,
+    cancel_on_tap_outside: true
   });
 
   const btnDiv = document.getElementById("overlayGoogleBtn") || document.getElementById("buttonDiv");
@@ -597,26 +699,39 @@ function initGoogleAuth() {
     scope: 'https://www.googleapis.com/auth/drive.file',
     callback: async (response) => {
       if (response.error !== undefined) {
-        alert("Authentication failed.");
+        alert("Google Drive authentication failed.");
+        pendingDriveSave = false;
+        pendingDriveLoad = false;
         return;
       }
       gUserAccessToken = response.access_token;
-      await loadDataFromDrive();
+      updateSettingsDisplay();
+      if (pendingDriveSave) {
+        pendingDriveSave = false;
+        await saveDataToDrive();
+      } else if (pendingDriveLoad) {
+        pendingDriveLoad = false;
+        await loadDataFromDrive();
+      }
     },
   });
 }
 
 function handleGoogleLogin() {
-  try {
-    google.accounts.id.prompt();
-  } catch (e) {
-    if (!tokenClient) initGoogleAuth();
-    if (tokenClient) {
-      tokenClient.requestAccessToken({ prompt: 'consent' });
-    }
+  if (typeof google === 'undefined' || !google.accounts) {
+    alert("Google Identity Services not loaded. Refresh the app and try again.");
+    return;
   }
-}
 
+  if (!tokenClient) initGoogleAuth();
+
+  if (gUserEmail && tokenClient) {
+    tokenClient.requestAccessToken({ prompt: 'consent' });
+    return;
+  }
+
+  google.accounts.id.prompt();
+}
 async function findExistingFileId(fileName) {
   const query = encodeURIComponent(`name = '${fileName}' and trashed = false`);
   const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${query}`, {
@@ -631,7 +746,25 @@ async function findExistingFileId(fileName) {
 
 async function saveDataToDrive() {
   if (!gUserAccessToken) {
-    alert("Please sign in with Google first!");
+    if (gUserEmail) {
+      if (!tokenClient) initGoogleAuth();
+      if (tokenClient) {
+        pendingDriveSave = true;
+        tokenClient.requestAccessToken({ prompt: 'consent' });
+        return;
+      }
+      alert("Google services are not ready yet. Refresh the app and try again.");
+      return;
+    }
+
+    if (!tokenClient) initGoogleAuth();
+    if (tokenClient) {
+      pendingDriveSave = true;
+      google.accounts.id.prompt();
+      return;
+    }
+
+    alert("Please connect to Google first.");
     return;
   }
 
@@ -799,10 +932,46 @@ function resetTimer() {
   if (startBtn) startBtn.innerText = "Start";
 }
 
-window.onload = () => {
+function redirectToIndexIfNeeded() {
+  const currentPath = window.location.pathname.split('/').pop().toLowerCase() || 'index.html';
+  if (currentPath === 'index.html' || currentPath === '') return;
+
+  const sameOriginReferrer = document.referrer && document.referrer.startsWith(window.location.origin);
+  const navEntries = performance.getEntriesByType ? performance.getEntriesByType('navigation') : [];
+  const navType = navEntries.length ? navEntries[0].type : (performance.navigation && performance.navigation.type === 1 ? 'reload' : 'navigate');
+
+  if (!sameOriginReferrer || navType === 'reload' || navType === 'back_forward') {
+    window.location.replace('index.html');
+  }
+}
+
+function resetInactivityTimer() {
+  lastActivity = Date.now();
+}
+
+function startInactivityWatcher() {
+  const activityEvents = ['click', 'keydown', 'touchstart', 'mousemove', 'scroll'];
+  activityEvents.forEach(eventName => window.addEventListener(eventName, resetInactivityTimer, { passive: true }));
+
+  inactivityInterval = setInterval(() => {
+    if (Date.now() - lastActivity >= INACTIVITY_LIMIT_MS) {
+      location.reload();
+    }
+  }, 60 * 1000);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      resetInactivityTimer();
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  redirectToIndexIfNeeded();
   loadState();
-  setTimeout(initGoogleAuth, 500);
-};
+  initGoogleAuth();
+  startInactivityWatcher();
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
