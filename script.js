@@ -21,13 +21,6 @@ function handleCredentialResponse(response) {
 
 const SAVE_KEY = "gymtracker_save";
 const $ = (id) => document.getElementById(id);
-const AUTH_CHECK_KEY = "gym_auth_check_timestamp";
-const AUTH_CHECK_TTL = 3 * 60 * 60 * 1000;
-const INACTIVITY_LIMIT_MS = 3 * 60 * 60 * 1000;
-
-let authCheckedAt = parseInt(sessionStorage.getItem(AUTH_CHECK_KEY), 10) || 0;
-let lastActivity = Date.now();
-let inactivityInterval = null;
 
 // Google Sheets Web App URL for license key validation 
 const LICENSE_API_URL = "https://script.google.com/macros/s/AKfycbw8FkI4EkCUS5NpN3BBJqNAd-_lZ6cKTPJSDWyzeyYwxlZXAqL6oFK6ckVu9RD8DiUs0Q/exec"; 
@@ -57,8 +50,6 @@ let S = {
   theme: "dark"
 };
 
-// Check persistent session storage across page transitions
-let isSessionVerified = localStorage.getItem("gym_session_verified") === "true";
 let gUserEmail = localStorage.getItem("userEmail") || null;
 
 /* --- TOAST & THEME --- */
@@ -103,15 +94,6 @@ function getSavedLicenseKey() {
   return localStorage.getItem("gym_license_key") || "";
 }
 
-function saveAuthCheckTimestamp() {
-  authCheckedAt = Date.now();
-  sessionStorage.setItem(AUTH_CHECK_KEY, String(authCheckedAt));
-}
-
-function isAuthCheckExpired() {
-  return Date.now() - authCheckedAt > AUTH_CHECK_TTL;
-}
-
 function showActivationOverlay() {
   const overlay = $("activationOverlay");
   if (overlay) overlay.style.display = "flex";
@@ -130,10 +112,7 @@ function verifySavedActivationKey(key, statusDiv = null, hideOnSuccess = true) {
   })
   .then(response => response.json())
   .then(data => {
-    saveAuthCheckTimestamp();
     if (data.success) {
-      isSessionVerified = true;
-      localStorage.setItem("gym_session_verified", "true");
       localStorage.setItem("gym_license_key", key);
       if (hideOnSuccess) {
         const overlay = $("activationOverlay");
@@ -142,8 +121,6 @@ function verifySavedActivationKey(key, statusDiv = null, hideOnSuccess = true) {
       updateSettingsDisplay();
       return true;
     }
-    isSessionVerified = false;
-    localStorage.setItem("gym_session_verified", "false");
     if (statusDiv) {
       statusDiv.innerText = `❌ ${data.message || "Invalid or Expired Key"}`;
       statusDiv.style.color = "var(--red)";
@@ -151,34 +128,12 @@ function verifySavedActivationKey(key, statusDiv = null, hideOnSuccess = true) {
     return false;
   })
   .catch(() => {
-    saveAuthCheckTimestamp();
     if (statusDiv) {
       statusDiv.innerText = "❌ Connection error during validation.";
       statusDiv.style.color = "var(--red)";
     }
     return false;
   });
-}
-
-function checkSessionVerification() {
-  const overlay = $("activationOverlay");
-  const savedKey = getSavedLicenseKey();
-
-  if (gUserEmail && savedKey && !isSessionVerified && (authCheckedAt === 0 || isAuthCheckExpired())) {
-    verifySavedActivationKey(savedKey, $("overlayKeyStatus"), false);
-  }
-
-  if (isSessionVerified && savedKey && gUserEmail) {
-    if (overlay) overlay.style.display = "none";
-    updateSettingsDisplay();
-  } else {
-    showActivationOverlay();
-    if (savedKey) {
-      const overlayInput = $("overlayKeyInput");
-      if (overlayInput) overlayInput.value = savedKey;
-    }
-    updateGoogleAuthUIStates();
-  }
 }
 
 function updateGoogleAuthUIStates() {
@@ -243,7 +198,6 @@ async function overlayVerifyAndUnlock() {
     statusDiv.innerText = "✓ Success! Unlocking...";
     statusDiv.style.color = "var(--ac)";
     localStorage.setItem("gym_license_key", key);
-    localStorage.setItem("gym_session_verified", "true");
     setTimeout(() => {
       const overlay = $("activationOverlay");
       if (overlay) overlay.style.display = "none";
@@ -252,7 +206,7 @@ async function overlayVerifyAndUnlock() {
   }
 }
 
-/* --- STATE STORAGE & AUTO-SYNC --- */
+/* --- STATE STORAGE & AUTO-SYNC --- "}
 let driveSyncTimeout = null;
 
 function saveState() {
@@ -313,7 +267,6 @@ function loadState() {
   if (streakCountEl) streakCountEl.innerText = S.streak.count || 1;
 
   renderPageSpecifics();
-  checkSessionVerification();
 }
 
 function handleGlobalDateChange() {
@@ -874,45 +827,9 @@ function resetTimer() {
   if (startBtn) startBtn.innerText = "Start";
 }
 
-function redirectToIndexIfNeeded() {
-  const currentPath = window.location.pathname.split('/').pop().toLowerCase() || 'index.html';
-  if (currentPath === 'index.html' || currentPath === '') return;
-
-  const sameOriginReferrer = document.referrer && document.referrer.startsWith(window.location.origin);
-  const navEntries = performance.getEntriesByType ? performance.getEntriesByType('navigation') : [];
-  const navType = navEntries.length ? navEntries[0].type : (performance.navigation && performance.navigation.type === 1 ? 'reload' : 'navigate');
-
-  if (!sameOriginReferrer || navType === 'reload' || navType === 'back_forward') {
-    window.location.replace('index.html');
-  }
-}
-
-function resetInactivityTimer() {
-  lastActivity = Date.now();
-}
-
-function startInactivityWatcher() {
-  const activityEvents = ['click', 'keydown', 'touchstart', 'mousemove', 'scroll'];
-  activityEvents.forEach(eventName => window.addEventListener(eventName, resetInactivityTimer, { passive: true }));
-
-  inactivityInterval = setInterval(() => {
-    if (Date.now() - lastActivity >= INACTIVITY_LIMIT_MS) {
-      location.reload();
-    }
-  }, 60 * 1000);
-
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      resetInactivityTimer();
-    }
-  });
-}
-
 document.addEventListener('DOMContentLoaded', () => {
-  redirectToIndexIfNeeded();
   loadState();
   initGoogleAuth();
-  startInactivityWatcher();
 });
 
 if ('serviceWorker' in navigator) {
